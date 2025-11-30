@@ -25,7 +25,8 @@
     "noUncheckedSideEffectImports": true,
 
     /* Path Aliases */
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
+    // Note: set to "5.0" to silence deprecation warnings for this TypeScript version.
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
