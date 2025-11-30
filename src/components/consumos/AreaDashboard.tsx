@@ -76,7 +76,6 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       // Determinar si es habitación (solo números) o cliente (texto)
       const esHabitacion = /^\d+$/.test(c.habitacionOCliente.trim());
       const identificador = esHabitacion ? `🏨 Hab. ${c.habitacionOCliente}` : `👤 ${c.habitacionOCliente}`;
-      
       transacciones.push({
         tipo: 'CONSUMO',
         hora,
@@ -86,6 +85,21 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
         icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
         datosTransferencia: c.datosTransferencia,
       });
+    });
+
+    // 2b. Agregar pagos parciales desde movimientos de caja (mostrar siempre, aunque el ticket esté cerrado)
+    movimientos.forEach((m) => {
+      if (m.descripcion && m.descripcion.startsWith('Pago parcial')) {
+        transacciones.push({
+          tipo: 'CONSUMO',
+          hora: new Date(m.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+          descripcion: m.descripcion,
+          monto: m.monto,
+          metodoPago: m.metodoPago || undefined,
+          icono: <ShoppingCart className="h-5 w-5 text-yellow-600" />,
+          datosTransferencia: m.datosTransferencia,
+        });
+      }
     });
 
     // 3. Agregar gastos

@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useConsumosStore } from '@/store/consumosStore';
+import { useConsumosStore, useCajasStore } from '@/store/consumosStore';
 import { useAuthStore } from '@/store/authStore';
 import type { AreaConsumo, EstadoConsumo, MetodoPago } from '@/types/consumos';
 import { getTodayISO } from '@/utils/dateHelpers';
@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { ComprobanteTransferenciaModal } from '@/components/cajas/ComprobanteTransferenciaModal';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle2 } from 'lucide-react';
 import {
   AlertDialog,
@@ -41,17 +41,57 @@ interface ProductoAgregado {
   subtotal: number;
 }
 
+import type { PagoRegistrado } from '@/types/consumos';
 interface PedidoActivo {
   id: string;
   nombre: string; // Nombre temporal del pedido
   productos: ProductoAgregado[];
   fechaInicio: string;
+  pagos?: PagoRegistrado[];
+  estado?: string;
+  montoPagado?: number;
 }
 
 export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   const { addConsumo } = useConsumosStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
+  // Helper: parsear montos que vienen de OCR / inputs en formatos locales
+  const parseMonto = (raw: any): number => {
+    if (raw == null) return 0;
+    if (typeof raw === 'number') return raw;
+    let s = String(raw).trim();
+    if (s === '') return 0;
+    // Eliminar espacios
+    s = s.replace(/\s+/g, '');
+    // Si contiene coma como separador decimal (es-AR), reemplazar por punto y eliminar puntos miles
+    // Ej: '1.400,00' -> '1400.00'
+    const commaCount = (s.match(/,/g) || []).length;
+    const dotCount = (s.match(/\./g) || []).length;
+    if (commaCount > 0 && dotCount > 0) {
+      // Asumimos formato 1.234,56 -> eliminar puntos, reemplazar coma
+      s = s.replace(/\./g, '').replace(/,/g, '.');
+    } else if (commaCount > 0 && dotCount === 0) {
+      // Podría ser '1400,00' o '1,400' -> reemplazar coma por punto
+      s = s.replace(/,/g, '.');
+    } else {
+      // Solo puntos: determinar si el punto es separador de miles o decimal
+      if (dotCount > 1) {
+        // varios puntos -> eliminarlos como separadores de miles
+        s = s.replace(/\./g, '');
+      } else if (dotCount === 1) {
+        // Un solo punto: si los dígitos después del punto son 3 -> probable separador de miles
+        const parts = s.split('.');
+        if (parts[1] && parts[1].length === 3) {
+          s = parts.join(''); // eliminar el punto
+        } else {
+          // Si no, lo interpretamos como decimal y lo dejamos
+        }
+      }
+    }
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
   
   // Estado para agregar productos
   const [categoria, setCategoria] = useState('');
@@ -183,84 +223,136 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
     if (!pedido) return;
 
+
     const fechaActual = getTodayISO();
     const totalPedido = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
-    
-    // Si es transferencia, validar el monto
-    let estadoFinal = estado;
-    let montoPagadoTotal = null;
-    
+    let pagos: PagoRegistrado[] = pedido.pagos || [];
+    let montoPagadoAcumulado = pagos.reduce((sum: number, p: PagoRegistrado) => sum + p.monto, 0);
+    let estadoFinal: string = estado;
+    let montoPagadoTotal: number | null = null;
+
+    // Si es transferencia, validar el monto y registrar pago parcial
     if (datosTransferencia && metodoPago === 'TRANSFERENCIA') {
-      const montoTransferencia = parseFloat(datosTransferencia.monto) || 0;
-      
-      if (montoTransferencia < totalPedido) {
-        // Pago parcial
-        estadoFinal = 'PAGO_PARCIAL';
-        montoPagadoTotal = montoTransferencia;
-        
-        toast({
-          title: "💰 Pago parcial registrado",
-          description: `Se pagó $${montoTransferencia.toFixed(2)} de $${totalPedido.toFixed(2)}. Resta: $${(totalPedido - montoTransferencia).toFixed(2)}`,
-          variant: "default",
-        });
-      } else if (montoTransferencia > totalPedido) {
-        // Advertencia si paga de más
-        toast({
-          title: "⚠️ Monto mayor al total",
-          description: `Se transfirieron $${montoTransferencia.toFixed(2)} pero el total es $${totalPedido.toFixed(2)}`,
-          variant: "destructive",
-        });
-      }
-    }
-
-    // Registrar cada producto como un consumo separado
-    pedido.productos.forEach((producto) => {
-      const consumoData: any = {
+      // Asegurar que el monto es número real, no string decimal
+      let montoTransferencia = parseMonto(datosTransferencia.monto);
+      // Registrar pago parcial en el array de pagos
+      const nuevoPago: PagoRegistrado = {
+        id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         fecha: fechaActual,
-        area,
-        habitacionOCliente,
-        consumoDescripcion: producto.nombre,
-        categoria: producto.categoria,
-        precioUnitario: producto.precioUnitario,
-        cantidad: producto.cantidad,
-        total: producto.subtotal,
-        estado: estadoFinal,
-        montoPagado: estadoFinal === 'PAGADO' ? producto.subtotal : (estadoFinal === 'PAGO_PARCIAL' ? montoPagadoTotal : null),
-        metodoPago: (estadoFinal === 'PAGADO' || estadoFinal === 'PAGO_PARCIAL') ? metodoPago : null,
+        metodo: 'TRANSFERENCIA',
+        monto: montoTransferencia,
         usuarioRegistroId: user?.id || '',
-      };
-
-      // Agregar datos de transferencia si existen (incluyendo imagen)
-      if (datosTransferencia && metodoPago === 'TRANSFERENCIA') {
-        consumoData.datosTransferencia = {
+        datosTransferencia: {
           hora: datosTransferencia.hora,
           aliasCbu: datosTransferencia.aliasCbu,
           banco: datosTransferencia.banco,
           numeroOperacion: datosTransferencia.numeroOperacion,
           imagenComprobante: datosTransferencia.imagenComprobante,
-          monto: datosTransferencia.monto,
-        };
+        },
+      };
+      pagos = [...pagos, nuevoPago];
+      montoPagadoAcumulado += montoTransferencia;
+
+      // Registrar movimiento de caja por el pago parcial
+      const { addMovimiento } = useCajasStore.getState();
+      addMovimiento({
+        fecha: fechaActual,
+        area,
+        tipo: 'INGRESO',
+        origen: 'CONSUMO',
+        descripcion: `Pago parcial - ${pedido.productos.map(p => p.nombre).join(', ')} - ${habitacionOCliente}`,
+        monto: montoTransferencia,
+        metodoPago: 'TRANSFERENCIA',
+        datosTransferencia: nuevoPago.datosTransferencia,
+      });
+
+      if (montoPagadoAcumulado < totalPedido) {
+        // Pago parcial
+        estadoFinal = 'PAGO_PARCIAL';
+        montoPagadoTotal = montoPagadoAcumulado;
+        // Actualizar el pedido con los pagos acumulados
+        setPedidosActivos(pedidosActivos.map(p =>
+          p.id === pedidoACerrar ? { ...p, pagos, estado: estadoFinal, montoPagado: montoPagadoTotal ?? undefined } : p
+        ));
+        toast({
+          title: "💰 Pago parcial registrado",
+          description: `Se pagó $${montoPagadoAcumulado.toFixed(2)} de $${totalPedido.toFixed(2)}. Resta: $${(totalPedido - montoPagadoAcumulado).toFixed(2)}`,
+          variant: "default",
+        });
+        setMostrarModalCierre(false);
+        setPedidoACerrar(null);
+        return;
+      } else if (montoPagadoAcumulado > totalPedido) {
+        // Advertencia si paga de más
+        toast({
+          title: "⚠️ Monto mayor al total",
+          description: `Se transfirieron $${montoPagadoAcumulado.toFixed(2)} pero el total es $${totalPedido.toFixed(2)}`,
+          variant: "destructive",
+        });
+      } else {
+        // Pago completo con este último pago
+        estadoFinal = 'PAGADO';
+        montoPagadoTotal = montoPagadoAcumulado;
       }
-
-      addConsumo(consumoData);
-    });
-
-    // Eliminar pedido de la lista de activos
-    setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-    
-    // Si era el seleccionado, limpiar selección
-    if (pedidoSeleccionado === pedidoACerrar) {
-      setPedidoSeleccionado(null);
     }
 
-    setMostrarModalCierre(false);
-    setPedidoACerrar(null);
-    
-    if (estadoFinal !== 'PAGO_PARCIAL') {
+    // Registrar cada producto como un consumo separado SOLO si está pagado completo
+    if (estadoFinal === 'PAGADO') {
+      pedido.productos.forEach((producto) => {
+        const consumoData: any = {
+          fecha: fechaActual,
+          area,
+          habitacionOCliente,
+          consumoDescripcion: producto.nombre,
+          categoria: producto.categoria,
+          precioUnitario: producto.precioUnitario,
+          cantidad: producto.cantidad,
+          total: producto.subtotal,
+          estado: estadoFinal,
+          montoPagado: producto.subtotal,
+          metodoPago: metodoPago,
+          usuarioRegistroId: user?.id || '',
+          pagos: pagos,
+        };
+        // Si hubo pagos parciales con transferencia, pasar los comprobantes
+        if (pagos && pagos.length > 0) {
+          const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
+          if (pagosTransfer.length > 0) {
+            // Solo para compatibilidad con tablas viejas
+            consumoData.datosTransferencia = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
+          }
+        }
+        addConsumo(consumoData);
+      });
+      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+      if (pedidoSeleccionado === pedidoACerrar) {
+        setPedidoSeleccionado(null);
+      }
+      setMostrarModalCierre(false);
+      setPedidoACerrar(null);
       toast({
         title: "✅ Pedido cerrado exitosamente",
         description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
       });
+    }
+
+    // Solo eliminar el pedido si está completamente pagado
+    if (estadoFinal !== 'PAGO_PARCIAL') {
+      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+      // Si era el seleccionado, limpiar selección
+      if (pedidoSeleccionado === pedidoACerrar) {
+        setPedidoSeleccionado(null);
+      }
+      setMostrarModalCierre(false);
+      setPedidoACerrar(null);
+      toast({
+        title: "✅ Pedido cerrado exitosamente",
+        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
+      });
+    } else {
+      // Si es pago parcial, solo cerrar el modal
+      setMostrarModalCierre(false);
+      setPedidoACerrar(null);
     }
   };
 
@@ -391,6 +483,14 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                           <p className="text-lg font-bold text-green-700 dark:text-green-400">
                             ${total.toFixed(2)}
                           </p>
+                          {/* Avance de pago parcial en el resumen del ticket */}
+                          {pedido.pagos && pedido.pagos.length > 0 && (
+                            <div className="text-xs mt-1">
+                              <span className="text-green-700 dark:text-green-400 font-semibold">Pagado: ${pedido.pagos.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}</span>
+                              <span className="mx-1 text-muted-foreground">|</span>
+                              <span className="text-yellow-700 dark:text-yellow-400 font-semibold">Restante: ${(total - pedido.pagos.reduce((sum, p) => sum + p.monto, 0)).toFixed(2)}</span>
+                            </div>
+                          )}
                         </div>
                         <div className="flex flex-col gap-1">
                           <Button
@@ -579,7 +679,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
           {/* Total del pedido actual */}
           {pedidoActual && totalPedidoActual > 0 && (
-            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-2 border-green-300 dark:border-green-700 rounded-lg p-4">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-2 border-green-300 dark:border-green-700 rounded-lg p-4 mb-2">
               <div className="flex justify-between items-center">
                 <div>
                   <p className="text-sm text-green-700 dark:text-green-400 font-medium">Total del Pedido:</p>
@@ -591,6 +691,14 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   ${totalPedidoActual.toFixed(2)}
                 </span>
               </div>
+              {/* Avance de pago parcial */}
+              {pedidoActual.pagos && pedidoActual.pagos.length > 0 && (
+                <div className="mt-2 text-center">
+                  <span className="text-green-700 dark:text-green-400 font-semibold">Pagado: ${pedidoActual.pagos.reduce((sum, p) => sum + p.monto, 0).toFixed(2)}</span>
+                  <span className="mx-2 text-muted-foreground">|</span>
+                  <span className="text-yellow-700 dark:text-yellow-400 font-semibold">Restante: ${(totalPedidoActual - pedidoActual.pagos.reduce((sum, p) => sum + p.monto, 0)).toFixed(2)}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -606,12 +714,22 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
               
               <div className="space-y-4">
                 {/* Total destacado */}
-                <div className="bg-green-50 dark:bg-green-950 border-2 border-green-500 rounded-lg p-4 text-center">
-                  <div className="text-sm text-muted-foreground mb-1">Total del pedido</div>
-                  <div className="text-3xl font-bold text-green-700 dark:text-green-400">
-                    ${pedidosActivos.find(p => p.id === pedidoACerrar)?.productos.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2) || '0.00'}
-                  </div>
-                </div>
+                {(() => {
+                  const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
+                  if (!pedido) return null;
+                  const total = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
+                  const pagado = pedido.pagos ? pedido.pagos.reduce((sum, p) => sum + p.monto, 0) : 0;
+                  const restante = total - pagado;
+                  return (
+                    <div className="bg-green-50 dark:bg-green-950 border-2 border-green-500 rounded-lg p-4 text-center">
+                      <div className="text-sm text-muted-foreground mb-1">{pagado > 0 ? 'Restante por cobrar' : 'Total del pedido'}</div>
+                      <div className={`text-3xl font-bold ${pagado > 0 ? 'text-yellow-700 dark:text-yellow-400' : 'text-green-700 dark:text-green-400'}`}>${(pagado > 0 ? restante : total).toFixed(2)}</div>
+                      {pagado > 0 && (
+                        <div className="mt-1 text-xs text-green-700 dark:text-green-400">Pagado: ${pagado.toFixed(2)}</div>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div>
                   <Label htmlFor="habitacion-cierre">Habitación/Cliente</Label>
                   <Input
