@@ -28,15 +28,19 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
     
     if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado) {
       // Consumo pagado inmediatamente
-      addMovimiento({
-        fecha: newConsumo.fecha,
-        area: newConsumo.area,
-        tipo: 'INGRESO',
-        origen: 'CONSUMO',
-        descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
-        monto: newConsumo.montoPagado,
-        metodoPago: newConsumo.metodoPago || 'EFECTIVO',
-      });
+      // No registrar movimiento duplicado si ya se registró para transferencias en pagos parciales
+      const yaRegistradoTransferencia = newConsumo.pagos?.some(p => p.metodo === 'TRANSFERENCIA') ?? false;
+      if (!yaRegistradoTransferencia) {
+        addMovimiento({
+          fecha: newConsumo.fecha,
+          area: newConsumo.area,
+          tipo: 'INGRESO',
+          origen: 'CONSUMO',
+          descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
+          monto: newConsumo.montoPagado,
+          metodoPago: newConsumo.metodoPago || 'EFECTIVO',
+        });
+      }
     } else if (newConsumo.estado === 'CARGAR_HABITACION') {
       // Consumo cargado a habitación (pendiente de cobro)
       addMovimiento({
