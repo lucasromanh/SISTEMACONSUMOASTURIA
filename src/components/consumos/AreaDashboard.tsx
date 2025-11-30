@@ -57,7 +57,8 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       datosTransferencia?: any;
     }> = [];
 
-    // 1. Agregar ingreso inicial (si existe)
+    // Priorizar movimientos como fuente de la verdad financiera
+    // 1. Ingreso inicial
     const ingresoInicial = movimientos.find((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'INICIAL');
     if (ingresoInicial) {
       transacciones.push({
@@ -70,39 +71,56 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       });
     }
 
-    // 2. Agregar consumos
-    consumos.forEach((c) => {
-      const hora = new Date(c.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-      // Determinar si es habitación (solo números) o cliente (texto)
-      const esHabitacion = /^\d+$/.test(c.habitacionOCliente.trim());
-      const identificador = esHabitacion ? `🏨 Hab. ${c.habitacionOCliente}` : `👤 ${c.habitacionOCliente}`;
-      transacciones.push({
-        tipo: 'CONSUMO',
-        hora,
-        descripcion: `${c.consumoDescripcion} - ${identificador} (${c.cantidad}x)`,
-        monto: c.estado === 'PAGADO' ? (c.montoPagado || 0) : c.total,
-        metodoPago: c.estado === 'PAGADO' ? (c.metodoPago || 'EFECTIVO') : 'CARGAR_HABITACION',
-        icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
-        datosTransferencia: c.datosTransferencia,
-      });
-    });
-
-    // 2b. Agregar pagos parciales desde movimientos de caja (mostrar siempre, aunque el ticket esté cerrado)
+    // 2. Agregar movimientos (ingresos/egresos) relacionados a consumos y otros
     movimientos.forEach((m) => {
-      if (m.descripcion && m.descripcion.startsWith('Pago parcial')) {
+      // Saltar ingreso inicial ya agregado
+      if (m.origen === 'INICIAL') return;
+
+      const hora = new Date(m.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+
+      if (m.tipo === 'INGRESO' && m.origen === 'CONSUMO') {
         transacciones.push({
           tipo: 'CONSUMO',
-          hora: new Date(m.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+          hora,
           descripcion: m.descripcion,
           monto: m.monto,
           metodoPago: m.metodoPago || undefined,
-          icono: <ShoppingCart className="h-5 w-5 text-yellow-600" />,
+          icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
           datosTransferencia: m.datosTransferencia,
+        });
+      }
+
+      if (m.tipo === 'EGRESO') {
+        transacciones.push({
+          tipo: 'GASTO',
+          hora,
+          descripcion: m.descripcion,
+          monto: m.monto,
+          metodoPago: undefined,
+          icono: <ArrowDownCircle className="h-5 w-5 text-red-600" />,
         });
       }
     });
 
-    // 3. Agregar gastos
+    // 3. Agregar consumos que no tengan movimiento asociado (evitar duplicados)
+    consumos.forEach((c) => {
+      // Buscar si existe un movimiento con la misma descripción y monto
+      const movimientoExistente = movimientos.find((m) => m.descripcion && m.descripcion.includes(c.consumoDescripcion) && Math.abs(m.monto - (c.montoPagado || c.total)) < 0.01);
+      if (!movimientoExistente) {
+        const hora = new Date(c.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        transacciones.push({
+          tipo: 'CONSUMO',
+          hora,
+          descripcion: `${c.consumoDescripcion} - ${/^\d+$/.test(c.habitacionOCliente.trim()) ? `Hab. ${c.habitacionOCliente}` : c.habitacionOCliente} (${c.cantidad}x)`,
+          monto: c.estado === 'PAGADO' ? (c.montoPagado || 0) : c.total,
+          metodoPago: c.estado === 'PAGADO' ? (c.metodoPago || 'EFECTIVO') : 'CARGAR_HABITACION',
+          icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
+          datosTransferencia: c.datosTransferencia,
+        });
+      }
+    });
+
+    // 4. Agregar gastos (desde stock/gastos)
     gastos.forEach((g) => {
       const hora = new Date(g.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
       transacciones.push({
@@ -120,24 +138,33 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
   // Calcular totales del día
   const totalesDia = useMemo(() => {
+    // Usar movimientos como fuente de verdad para totales financieros
     const ingresoInicial = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'INICIAL')
       .reduce((sum: number, m: MovimientoCaja) => sum + m.monto, 0);
 
-    const consumosEfectivo = consumos
-      .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'EFECTIVO')
-      .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
+    const consumosEfectivo = movimientos
+      .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'EFECTIVO')
+      .reduce((sum, m) => sum + m.monto, 0);
 
-    const consumosTransferencia = consumos
-      .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TRANSFERENCIA')
-      .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
+    const consumosTransferencia = movimientos
+      .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
+      .reduce((sum, m) => sum + m.monto, 0);
 
-    const consumosCargados = consumos
+    // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
+    const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
       .reduce((sum, c) => sum + c.total, 0);
 
-    const totalGastos = gastos.reduce((sum, g) => sum + g.monto, 0);
-    const gastosEfectivo = totalGastos; // Los gastos se consideran todos en efectivo
+    const consumosCargadosFromMov = movimientos
+      .filter((m) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && (!m.metodoPago || m.metodoPago === undefined))
+      .reduce((sum, m) => sum + m.monto, 0);
+
+    const consumosCargados = Math.max(consumosCargadosFromConsumos, consumosCargadosFromMov);
+
+    const totalGastosFromMov = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, m) => sum + m.monto, 0);
+    const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + g.monto, 0));
+    const gastosEfectivo = totalGastos;
 
     const totalIngresos = ingresoInicial + consumosEfectivo + consumosTransferencia;
     const saldoFinal = ingresoInicial + consumosEfectivo - gastosEfectivo;

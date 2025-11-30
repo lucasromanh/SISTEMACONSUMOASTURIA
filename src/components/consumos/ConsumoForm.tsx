@@ -296,8 +296,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       }
     }
 
-    // Registrar cada producto como un consumo separado SOLO si está pagado completo
-    if (estadoFinal === 'PAGADO') {
+    // Función auxiliar para registrar consumos (pagados o cargados a habitación)
+    const registrarConsumos = (estadoAUsar: string, montoPagadoPorProducto?: number) => {
       pedido.productos.forEach((producto) => {
         const consumoData: any = {
           fecha: fechaActual,
@@ -308,9 +308,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           precioUnitario: producto.precioUnitario,
           cantidad: producto.cantidad,
           total: producto.subtotal,
-          estado: estadoFinal,
-          montoPagado: producto.subtotal,
-          metodoPago: metodoPago,
+          estado: estadoAUsar,
+          montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
+          metodoPago: estadoAUsar === 'PAGADO' ? metodoPago : undefined,
           usuarioRegistroId: user?.id || '',
           pagos: pagos,
         };
@@ -318,28 +318,18 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         if (pagos && pagos.length > 0) {
           const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
           if (pagosTransfer.length > 0) {
-            // Solo para compatibilidad con tablas viejas
             consumoData.datosTransferencia = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
           }
         }
         addConsumo(consumoData);
       });
-      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-      if (pedidoSeleccionado === pedidoACerrar) {
-        setPedidoSeleccionado(null);
-      }
-      setMostrarModalCierre(false);
-      setPedidoACerrar(null);
-      toast({
-        title: "✅ Pedido cerrado exitosamente",
-        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
-      });
-    }
+    };
 
-    // Solo eliminar el pedido si está completamente pagado
-    if (estadoFinal !== 'PAGO_PARCIAL') {
+    // Registrar consumos si está PAGADO o si se debe cargar a habitación
+    if (estadoFinal === 'PAGADO') {
+      registrarConsumos('PAGADO');
+      // Remover pedido y cerrar modal
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-      // Si era el seleccionado, limpiar selección
       if (pedidoSeleccionado === pedidoACerrar) {
         setPedidoSeleccionado(null);
       }
@@ -349,8 +339,29 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         title: "✅ Pedido cerrado exitosamente",
         description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
       });
+    } else if (estadoFinal === 'CARGAR_HABITACION') {
+      // Registrar consumos con estado cargado a habitación
+      registrarConsumos('CARGAR_HABITACION');
+      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+      if (pedidoSeleccionado === pedidoACerrar) {
+        setPedidoSeleccionado(null);
+      }
+      setMostrarModalCierre(false);
+      setPedidoACerrar(null);
+      toast({
+        title: "✅ Pedido cargado a habitación",
+        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} cargado${pedido.productos.length !== 1 ? 's' : ''}`,
+      });
+    } else if (estadoFinal === 'PAGO_PARCIAL') {
+      // Si es pago parcial, solo cerrar el modal (los pagos parciales ya fueron registrados como movimientos)
+      setMostrarModalCierre(false);
+      setPedidoACerrar(null);
     } else {
-      // Si es pago parcial, solo cerrar el modal
+      // Otros estados: remover pedido y cerrar modal por seguridad
+      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+      if (pedidoSeleccionado === pedidoACerrar) {
+        setPedidoSeleccionado(null);
+      }
       setMostrarModalCierre(false);
       setPedidoACerrar(null);
     }
