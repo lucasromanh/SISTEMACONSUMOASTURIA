@@ -1,0 +1,89 @@
+/**
+ * Obtiene la fecha de hoy en formato ISO (YYYY-MM-DD)
+ */
+export function getTodayISO(): string {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+}
+
+/**
+ * Obtiene el inicio de la semana actual
+ */
+export function getStartOfWeek(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Ajustar cuando es domingo
+  return new Date(now.setDate(diff));
+}
+
+/**
+ * Obtiene el fin de la semana actual
+ */
+export function getEndOfWeek(): Date {
+  const start = getStartOfWeek();
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  return end;
+}
+
+/**
+ * Obtiene el inicio del mes actual
+ */
+export function getStartOfMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+/**
+ * Obtiene el fin del mes actual
+ */
+export function getEndOfMonth(): Date {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + 1, 0);
+}
+
+/**
+ * Convierte una fecha a formato ISO string (YYYY-MM-DD)
+ */
+export function toISODate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Verifica si una fecha está entre dos fechas
+ */
+export function isBetweenDates(date: string, startDate: string, endDate: string): boolean {
+  const d = new Date(date);
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  return d >= start && d <= end;
+}
+
+/**
+ * Obtiene el rango de fechas según el período
+ */
+export function getDateRangeByPeriod(period: 'day' | 'week' | 'month'): { start: string; end: string } {
+  const today = new Date();
+  let start: Date;
+  let end: Date = today;
+  
+  switch (period) {
+    case 'day':
+      start = today;
+      break;
+    case 'week':
+      start = getStartOfWeek();
+      end = getEndOfWeek();
+      break;
+    case 'month':
+      start = getStartOfMonth();
+      end = getEndOfMonth();
+      break;
+  }
+  
+  return {
+    start: toISODate(start),
+    end: toISODate(end),
+  };
+}

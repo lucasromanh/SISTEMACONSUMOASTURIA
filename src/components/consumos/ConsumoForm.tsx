@@ -1,0 +1,746 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { useConsumosStore } from '@/store/consumosStore';
+import { useAuthStore } from '@/store/authStore';
+import type { AreaConsumo, EstadoConsumo, MetodoPago } from '@/types/consumos';
+import { getTodayISO } from '@/utils/dateHelpers';
+import { ShoppingCart, Receipt, Calendar, Plus, AlertTriangle } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { useToast } from '@/hooks/use-toast';
+import { ComprobanteTransferenciaModal } from '@/components/cajas/ComprobanteTransferenciaModal';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { CheckCircle2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+
+interface ConsumoFormProps {
+  area: AreaConsumo;
+  productosPorCategoria: Record<string, { nombre: string; precio: number }[]>;
+}
+
+interface ProductoAgregado {
+  id: string;
+  categoria: string;
+  nombre: string;
+  precioUnitario: number;
+  cantidad: number;
+  subtotal: number;
+}
+
+interface PedidoActivo {
+  id: string;
+  nombre: string; // Nombre temporal del pedido
+  productos: ProductoAgregado[];
+  fechaInicio: string;
+}
+
+export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
+  const { addConsumo } = useConsumosStore();
+  const { user } = useAuthStore();
+  const { toast } = useToast();
+  
+  // Estado para agregar productos
+  const [categoria, setCategoria] = useState('');
+  const [productoSeleccionado, setProductoSeleccionado] = useState('');
+  const [precioUnitario, setPrecioUnitario] = useState('');
+  const [cantidad, setCantidad] = useState('1');
+  
+  // Pedidos activos (sin habitación/cliente aún)
+  const [pedidosActivos, setPedidosActivos] = useState<PedidoActivo[]>([]);
+  const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
+  
+  // Modal de cierre de pedido
+  const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
+  const [pedidoACerrar, setPedidoACerrar] = useState<string | null>(null);
+  const [mostrarComprobanteTransferencia, setMostrarComprobanteTransferencia] = useState(false);
+  const [habitacionOCliente, setHabitacionOCliente] = useState('');
+  const [estado, setEstado] = useState<EstadoConsumo>('CARGAR_HABITACION');
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
+  
+  // Modal de confirmación de cancelación
+  const [mostrarConfirmCancelar, setMostrarConfirmCancelar] = useState(false);
+  const [pedidoACancelar, setPedidoACancelar] = useState<string | null>(null);
+
+  const productosDisponibles = categoria ? productosPorCategoria[categoria] || [] : [];
+  
+  // Obtener pedido activo actual
+  const pedidoActual = pedidosActivos.find(p => p.id === pedidoSeleccionado);
+  
+  // Contador para nombres de pedidos
+  const [contadorPedidos, setContadorPedidos] = useState(1);
+
+  const handleProductoChange = (nombre: string) => {
+    setProductoSeleccionado(nombre);
+    const producto = productosDisponibles.find((p) => p.nombre === nombre);
+    if (producto) {
+      setPrecioUnitario(producto.precio.toString());
+    }
+  };
+
+  // Crear nuevo ticket de consumo
+  const handleCrearPedidoVacio = () => {
+    const nuevoPedido: PedidoActivo = {
+      id: `pedido-${Date.now()}`,
+      nombre: `Ticket #${contadorPedidos}`,
+      productos: [],
+      fechaInicio: new Date().toISOString(),
+    };
+
+    setPedidosActivos([...pedidosActivos, nuevoPedido]);
+    setPedidoSeleccionado(nuevoPedido.id);
+    setContadorPedidos(contadorPedidos + 1);
+  };
+
+  // Agregar producto al pedido seleccionado
+  const handleAgregarProducto = () => {
+    if (!pedidoSeleccionado) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Ticket requerido",
+        description: "Primero debe crear un ticket de consumo",
+      });
+      return;
+    }
+
+    if (!productoSeleccionado || !precioUnitario || !cantidad) {
+      return;
+    }
+
+    const cantidadNum = parseFloat(cantidad);
+    const precioNum = parseFloat(precioUnitario);
+    const subtotal = cantidadNum * precioNum;
+
+    const nuevoProducto: ProductoAgregado = {
+      id: `${Date.now()}-${Math.random()}`,
+      categoria,
+      nombre: productoSeleccionado,
+      precioUnitario: precioNum,
+      cantidad: cantidadNum,
+      subtotal,
+    };
+
+    // Agregar al pedido seleccionado
+    setPedidosActivos(pedidosActivos.map(pedido => 
+      pedido.id === pedidoSeleccionado
+        ? { ...pedido, productos: [...pedido.productos, nuevoProducto] }
+        : pedido
+    ));
+    
+    // Limpiar campos de producto
+    setCategoria('');
+    setProductoSeleccionado('');
+    setPrecioUnitario('');
+    setCantidad('1');
+  };
+
+  const handleEliminarProducto = (productoId: string) => {
+    if (!pedidoSeleccionado) return;
+
+    setPedidosActivos(pedidosActivos.map(pedido => 
+      pedido.id === pedidoSeleccionado
+        ? { ...pedido, productos: pedido.productos.filter(p => p.id !== productoId) }
+        : pedido
+    ));
+  };
+
+  // Abrir modal para cerrar pedido
+  const handleAbrirModalCierre = (pedidoId: string) => {
+    const pedido = pedidosActivos.find(p => p.id === pedidoId);
+    if (!pedido || pedido.productos.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Ticket vacío",
+        description: "El pedido debe tener al menos un producto",
+      });
+      return;
+    }
+    setPedidoACerrar(pedidoId);
+    setMostrarModalCierre(true);
+    setHabitacionOCliente('');
+    setEstado('CARGAR_HABITACION');
+    setMetodoPago(null);
+  };
+
+
+
+  // Procesar cierre de pedido (con o sin datos de transferencia)
+  const procesarCierrePedido = (datosTransferencia: any) => {
+
+    const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
+    if (!pedido) return;
+
+    const fechaActual = getTodayISO();
+    const totalPedido = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
+    
+    // Si es transferencia, validar el monto
+    let estadoFinal = estado;
+    let montoPagadoTotal = null;
+    
+    if (datosTransferencia && metodoPago === 'TRANSFERENCIA') {
+      const montoTransferencia = parseFloat(datosTransferencia.monto) || 0;
+      
+      if (montoTransferencia < totalPedido) {
+        // Pago parcial
+        estadoFinal = 'PAGO_PARCIAL';
+        montoPagadoTotal = montoTransferencia;
+        
+        toast({
+          title: "💰 Pago parcial registrado",
+          description: `Se pagó $${montoTransferencia.toFixed(2)} de $${totalPedido.toFixed(2)}. Resta: $${(totalPedido - montoTransferencia).toFixed(2)}`,
+          variant: "default",
+        });
+      } else if (montoTransferencia > totalPedido) {
+        // Advertencia si paga de más
+        toast({
+          title: "⚠️ Monto mayor al total",
+          description: `Se transfirieron $${montoTransferencia.toFixed(2)} pero el total es $${totalPedido.toFixed(2)}`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    // Registrar cada producto como un consumo separado
+    pedido.productos.forEach((producto) => {
+      const consumoData: any = {
+        fecha: fechaActual,
+        area,
+        habitacionOCliente,
+        consumoDescripcion: producto.nombre,
+        categoria: producto.categoria,
+        precioUnitario: producto.precioUnitario,
+        cantidad: producto.cantidad,
+        total: producto.subtotal,
+        estado: estadoFinal,
+        montoPagado: estadoFinal === 'PAGADO' ? producto.subtotal : (estadoFinal === 'PAGO_PARCIAL' ? montoPagadoTotal : null),
+        metodoPago: (estadoFinal === 'PAGADO' || estadoFinal === 'PAGO_PARCIAL') ? metodoPago : null,
+        usuarioRegistroId: user?.id || '',
+      };
+
+      // Agregar datos de transferencia si existen (incluyendo imagen)
+      if (datosTransferencia && metodoPago === 'TRANSFERENCIA') {
+        consumoData.datosTransferencia = {
+          hora: datosTransferencia.hora,
+          aliasCbu: datosTransferencia.aliasCbu,
+          banco: datosTransferencia.banco,
+          numeroOperacion: datosTransferencia.numeroOperacion,
+          imagenComprobante: datosTransferencia.imagenComprobante,
+          monto: datosTransferencia.monto,
+        };
+      }
+
+      addConsumo(consumoData);
+    });
+
+    // Eliminar pedido de la lista de activos
+    setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+    
+    // Si era el seleccionado, limpiar selección
+    if (pedidoSeleccionado === pedidoACerrar) {
+      setPedidoSeleccionado(null);
+    }
+
+    setMostrarModalCierre(false);
+    setPedidoACerrar(null);
+    
+    if (estadoFinal !== 'PAGO_PARCIAL') {
+      toast({
+        title: "✅ Pedido cerrado exitosamente",
+        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
+      });
+    }
+  };
+
+  // Abrir confirmación de cancelar pedido
+  const handleCancelarPedido = (pedidoId: string) => {
+    setPedidoACancelar(pedidoId);
+    setMostrarConfirmCancelar(true);
+  };
+  
+  // Confirmar cancelación de pedido
+  const confirmarCancelacion = () => {
+    if (pedidoACancelar) {
+      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACancelar));
+      if (pedidoSeleccionado === pedidoACancelar) {
+        setPedidoSeleccionado(null);
+      }
+      toast({
+        title: "🗑️ Pedido cancelado",
+        description: "El ticket ha sido eliminado",
+      });
+    }
+    setMostrarConfirmCancelar(false);
+    setPedidoACancelar(null);
+  };
+
+  const fechaActual = new Date();
+  const totalPedidoActual = pedidoActual ? pedidoActual.productos.reduce((sum, p) => sum + p.subtotal, 0) : 0;
+
+  return (
+    <Card className="border-2 shadow-lg bg-gradient-to-br from-background to-muted/20">
+      <CardHeader className="border-b bg-gradient-to-r from-hotel-wine-500 to-hotel-wine-600 text-white">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-xl sm:text-2xl flex items-center gap-2">
+            <ShoppingCart className="h-6 w-6" />
+            Registrar Consumo
+          </CardTitle>
+          <Badge variant="secondary" className="flex items-center gap-1 bg-white/20 text-white border-white/30">
+            <Calendar className="h-3 w-3" />
+            {format(fechaActual, "d 'de' MMM", { locale: es })}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 sm:p-6">
+        <div className="space-y-5">
+          {/* Fecha actual (solo informativa) */}
+          <div className="bg-blue-50 dark:bg-blue-950/30 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+              <Calendar className="h-5 w-5" />
+              <div>
+                <p className="text-sm font-medium">Registrando para:</p>
+                <p className="text-lg font-bold">
+                  {format(fechaActual, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón para crear nuevo ticket si no hay ninguno activo */}
+          {pedidosActivos.length === 0 && (
+            <div className="text-center p-8 border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-lg bg-blue-50/30 dark:bg-blue-950/20">
+              <div className="flex flex-col items-center gap-4">
+                <Receipt className="h-16 w-16 text-blue-500" />
+                <div>
+                  <h3 className="text-xl font-bold text-blue-700 dark:text-blue-400 mb-2">
+                    Crear Ticket de Consumo
+                  </h3>
+                  <p className="text-muted-foreground">
+                    Comienza creando un ticket para empezar a cargar productos
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleCrearPedidoVacio}
+                  className="h-14 px-8 text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
+                >
+                  <Plus className="h-6 w-6 mr-2" />
+                  Crear Nuevo Ticket
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Botón para crear ticket adicional cuando ya hay tickets activos */}
+          {pedidosActivos.length > 0 && (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                onClick={handleCrearPedidoVacio}
+                variant="outline"
+                className="h-12 px-6 border-2 border-blue-500 text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30"
+              >
+                <Plus className="h-5 w-5 mr-2" />
+                Crear Otro Ticket
+              </Button>
+            </div>
+          )}
+
+          {/* Tickets Activos */}
+          {pedidosActivos.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-bold text-lg flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-blue-600" />
+                Tickets Activos
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {pedidosActivos.map((pedido) => {
+                  const total = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
+                  const esActivo = pedido.id === pedidoSeleccionado;
+
+                  return (
+                    <div
+                      key={pedido.id}
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
+                        esActivo
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+                          : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
+                      }`}
+                      onClick={() => setPedidoSeleccionado(pedido.id)}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-base">
+                            {pedido.nombre}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {pedido.productos.length} producto{pedido.productos.length !== 1 ? 's' : ''}
+                          </p>
+                          <p className="text-lg font-bold text-green-700 dark:text-green-400">
+                            ${total.toFixed(2)}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAbrirModalCierre(pedido.id);
+                            }}
+                            disabled={pedido.productos.length === 0}
+                            className="h-8 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                          >
+                            💰 Cobrar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCancelarPedido(pedido.id);
+                            }}
+                            className="h-8 text-xs"
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Sección: Agregar Productos (solo si hay ticket seleccionado) */}
+          {pedidoSeleccionado && (
+            <div className="space-y-4 border-2 border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50/30 dark:bg-blue-950/20">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-lg flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                  <ShoppingCart className="h-5 w-5" />
+                  Agregar Productos
+                </h3>
+                {pedidoActual && (
+                  <Badge className="text-base bg-blue-700 text-white">
+                    {pedidoActual.nombre}
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+              <Label htmlFor="categoria" className="text-base font-semibold">
+                Categoría
+              </Label>
+              <Select value={categoria} onValueChange={setCategoria} required>
+                <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500">
+                  <SelectValue placeholder="Seleccione categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.keys(productosPorCategoria).map((cat) => (
+                    <SelectItem key={cat} value={cat} className="text-base">
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="producto" className="text-base font-semibold">
+                    Producto
+                  </Label>
+              <Select
+                value={productoSeleccionado}
+                onValueChange={handleProductoChange}
+                disabled={!categoria}
+                required
+              >
+                <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500 disabled:opacity-50">
+                  <SelectValue placeholder={categoria ? "Seleccione producto" : "Primero elija categoría"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {productosDisponibles.map((producto) => (
+                    <SelectItem key={producto.nombre} value={producto.nombre} className="text-base">
+                      <div className="flex justify-between items-center w-full gap-3">
+                        <span>{producto.nombre}</span>
+                        <span className="font-bold text-green-700">${producto.precio}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="precio" className="text-base font-semibold">
+                    Precio Unitario
+                  </Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
+                <Input
+                  id="precio"
+                  type="number"
+                  step="0.01"
+                  value={precioUnitario}
+                  onChange={(e) => setPrecioUnitario(e.target.value)}
+                  className="h-12 text-base border-2 focus:border-hotel-wine-500 pl-8"
+                  required
+                />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cantidad" className="text-base font-semibold">
+                    Cantidad
+                  </Label>
+              <Input
+                id="cantidad"
+                type="number"
+                step="0.1"
+                min="0.1"
+                value={cantidad}
+                onChange={(e) => setCantidad(e.target.value)}
+                    className="h-12 text-base border-2 focus:border-hotel-wine-500"
+                  />
+                </div>
+
+                {/* Botón para agregar producto */}
+                <div className="space-y-2 md:col-span-2">
+                <Button
+                  type="button"
+                  onClick={handleAgregarProducto}
+                  disabled={!productoSeleccionado || !precioUnitario || !cantidad}
+                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                    Agregar Producto a la Lista
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Lista de productos del pedido actual */}
+          {pedidoActual && pedidoActual.productos.length > 0 && (
+            <div className="space-y-3 border-2 border-green-200 dark:border-green-800 rounded-lg p-4 bg-green-50/30 dark:bg-green-950/20">
+              <div className="flex items-center justify-between border-b border-green-300 dark:border-green-700 pb-2">
+                <h3 className="font-bold text-lg text-green-700 dark:text-green-400">Productos en el Pedido</h3>
+                <Badge className="text-base bg-green-700 text-white">
+                  {pedidoActual.productos.length} {pedidoActual.productos.length === 1 ? 'item' : 'items'}
+                </Badge>
+              </div>
+              
+              <div className="space-y-2 max-h-60 overflow-y-auto">
+                {pedidoActual.productos.map((producto) => (
+                  <div
+                    key={producto.id}
+                    className="flex items-start justify-between gap-3 p-3 bg-white dark:bg-zinc-900 rounded-lg border-2 border-green-200 dark:border-green-800"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-base truncate">{producto.nombre}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {producto.categoria} • {producto.cantidad}x ${producto.precioUnitario.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <p className="font-bold text-lg text-green-700 dark:text-green-400">
+                        ${producto.subtotal.toFixed(2)}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEliminarProducto(producto.id)}
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-950"
+                      >
+                        ✕
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Total del pedido actual */}
+          {pedidoActual && totalPedidoActual > 0 && (
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-2 border-green-300 dark:border-green-700 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm text-green-700 dark:text-green-400 font-medium">Total del Pedido:</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {pedidoActual.productos.length} producto{pedidoActual.productos.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <span className="text-4xl font-bold text-green-700 dark:text-green-400">
+                  ${totalPedidoActual.toFixed(2)}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Modal de cierre de pedido */}
+          <Dialog open={mostrarModalCierre} onOpenChange={setMostrarModalCierre}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  Confirmar cierre de pedido
+                </DialogTitle>
+              </DialogHeader>
+              
+              <div className="space-y-4">
+                {/* Total destacado */}
+                <div className="bg-green-50 dark:bg-green-950 border-2 border-green-500 rounded-lg p-4 text-center">
+                  <div className="text-sm text-muted-foreground mb-1">Total del pedido</div>
+                  <div className="text-3xl font-bold text-green-700 dark:text-green-400">
+                    ${pedidosActivos.find(p => p.id === pedidoACerrar)?.productos.reduce((sum, p) => sum + p.subtotal, 0).toFixed(2) || '0.00'}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="habitacion-cierre">Habitación/Cliente</Label>
+                  <Input
+                    id="habitacion-cierre"
+                    value={habitacionOCliente}
+                    onChange={(e) => setHabitacionOCliente(e.target.value)}
+                    placeholder="Ej: 101 o Juan Pérez"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="estado">Estado del consumo</Label>
+                  <Select value={estado} onValueChange={(value: EstadoConsumo) => setEstado(value)}>
+                    <SelectTrigger id="estado">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="CARGAR_HABITACION">🏨 Cargar a habitación</SelectItem>
+                      <SelectItem value="PAGADO">💵 Pagado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {estado === 'PAGADO' && (
+                  <div>
+                    <Label htmlFor="metodo-pago">Método de pago</Label>
+                    <Select value={metodoPago || 'EFECTIVO'} onValueChange={(value) => setMetodoPago(value as MetodoPago)}>
+                      <SelectTrigger id="metodo-pago">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="EFECTIVO">💵 Efectivo</SelectItem>
+                        <SelectItem value="TRANSFERENCIA">🏦 Transferencia</SelectItem>
+                        <SelectItem value="TARJETA">💳 Tarjeta</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMostrarModalCierre(false);
+                    setPedidoACerrar(null);
+                  }}
+                >
+                  Cancelar
+                </Button>
+                {(() => {
+                  const pedidoCierre = pedidosActivos.find(p => p.id === pedidoACerrar);
+                  const totalCierre = pedidoCierre ? pedidoCierre.productos.reduce((sum, p) => sum + p.subtotal, 0) : 0;
+                  return (
+                    <Button
+                      onClick={() => {
+                        if (!pedidoCierre || pedidoCierre.productos.length === 0 || totalCierre === 0) {
+                          toast({
+                            variant: "destructive",
+                            title: "⚠️ Pedido vacío",
+                            description: "El pedido debe tener al menos un producto y un total mayor a $0.00",
+                          });
+                          return;
+                        }
+                        if (estado === 'PAGADO' && metodoPago === 'TRANSFERENCIA') {
+                          setMostrarModalCierre(false);
+                          setMostrarComprobanteTransferencia(true);
+                        } else {
+                          procesarCierrePedido(null);
+                        }
+                      }}
+                      disabled={!habitacionOCliente.trim() || !pedidoCierre || pedidoCierre.productos.length === 0 || totalCierre === 0}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Confirmar y cerrar
+                    </Button>
+                  );
+                })()}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* AlertDialog de confirmación de cancelación */}
+          <AlertDialog open={mostrarConfirmCancelar} onOpenChange={setMostrarConfirmCancelar}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                  ¿Está seguro de cancelar este pedido?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción eliminará el ticket y todos los productos agregados. No se podrá deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => {
+                  setMostrarConfirmCancelar(false);
+                  setPedidoACancelar(null);
+                }}>
+                  No, mantener
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={confirmarCancelacion}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Sí, cancelar ticket
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
+          {/* Modal de comprobante de transferencia */}
+          <ComprobanteTransferenciaModal
+            open={mostrarComprobanteTransferencia}
+            onOpenChange={(open) => {
+              setMostrarComprobanteTransferencia(open);
+              if (!open) {
+                // Si se cierra sin confirmar, volver al modal de cierre
+                setMostrarModalCierre(true);
+              }
+            }}
+            onConfirmar={(datos) => {
+              setMostrarComprobanteTransferencia(false);
+              procesarCierrePedido(datos);
+            }}
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
