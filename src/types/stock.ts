@@ -1,4 +1,4 @@
-import { AreaConsumo } from './consumos';
+import type { AreaConsumo } from './consumos';
 
 export interface StockItem {
   id: string;

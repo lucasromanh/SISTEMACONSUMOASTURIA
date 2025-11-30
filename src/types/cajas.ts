@@ -1,4 +1,4 @@
-import { AreaConsumo, MetodoPago } from './consumos';
+import type { AreaConsumo, MetodoPago } from './consumos';
 
 export interface MovimientoCaja {
   id: string;

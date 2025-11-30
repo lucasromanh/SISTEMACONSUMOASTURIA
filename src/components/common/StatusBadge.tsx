@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 
 const estadoConfig: Record<EstadoConsumo, { label: string; className: string }> = {
   PAGADO: { label: 'Pagado', className: 'bg-green-600 hover:bg-green-700 text-white' },
+  PAGO_PARCIAL: { label: 'Pago parcial', className: 'bg-amber-500 hover:bg-amber-600 text-white' },
   CARGAR_HABITACION: { label: 'Habitación', className: 'bg-blue-600 hover:bg-blue-700 text-white' },
 };
 

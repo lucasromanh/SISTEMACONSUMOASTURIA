@@ -136,8 +136,7 @@ export function ComprobanteTransferenciaModal({
       
       // Si encuentra una línea que dice "Banco: XXXX", ese es el DESTINO
       if (linea.startsWith('banco:')) {
-        const valorDespues = linea.replace('banco:', '').trim();
-        // NO usar este como origen, es el banco destino
+        // Línea con banco destino detectada; no usar como banco origen
         continue;
       }
       
