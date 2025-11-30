@@ -1,6 +1,6 @@
 export type EstadoConsumo = 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL';
 
-export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | null;
+export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | null;
 
 export type AreaConsumo = 'WINNE_BAR' | 'BARRA_PILETA' | 'FINCA' | 'RESTAURANTE';
 

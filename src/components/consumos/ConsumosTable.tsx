@@ -4,19 +4,51 @@ import { Badge } from '@/components/ui/badge';
 import type { Consumo } from '@/types/consumos';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
+import { useConsumosStore } from '@/store/consumosStore';
+import { useAuthStore } from '@/store/authStore';
+import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from 'react';
+import type { MetodoPago } from '@/types/consumos';
 
 interface ConsumosTableProps {
   consumos: Consumo[];
 }
 
 export function ConsumosTable({ consumos }: ConsumosTableProps) {
-  if (consumos.length === 0) {
-    return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p>No hay consumos registrados para mostrar.</p>
-      </div>
-    );
-  }
+  const { updateConsumo } = useConsumosStore();
+  const { user } = useAuthStore();
+  const { toast } = useToast();
+  const [pagoModalOpen, setPagoModalOpen] = useState(false);
+  const [consumoAPagar, setConsumoAPagar] = useState<Consumo | null>(null);
+  const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
+
+  const handlePagarConsumo = (consumo: Consumo) => {
+    setConsumoAPagar(consumo);
+    setMetodoPago('EFECTIVO');
+    setPagoModalOpen(true);
+  };
+
+  const confirmarPago = () => {
+    if (!consumoAPagar || !user) return;
+
+    updateConsumo(consumoAPagar.id, {
+      estado: 'PAGADO',
+      montoPagado: consumoAPagar.total,
+      metodoPago,
+      usuarioRegistroId: user.id,
+    });
+
+    toast({
+      title: "✅ Pago registrado",
+      description: `Se registró el pago de ${formatCurrency(consumoAPagar.total)} para ${consumoAPagar.consumoDescripcion}`,
+    });
+
+    setPagoModalOpen(false);
+    setConsumoAPagar(null);
+  };
 
   return (
     <>
@@ -35,6 +67,7 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead>Método Pago</TableHead>
+                <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -63,6 +96,17 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
+                  <TableCell>
+                    {consumo.estado === 'CARGAR_HABITACION' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handlePagarConsumo(consumo)}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        💰 Pagar
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -81,7 +125,18 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                     <p className="font-semibold text-lg">{consumo.consumoDescripcion}</p>
                     <p className="text-sm text-muted-foreground">{consumo.habitacionOCliente}</p>
                   </div>
-                  <StatusBadge estado={consumo.estado} />
+                  <div className="flex flex-col items-end gap-2">
+                    <StatusBadge estado={consumo.estado} />
+                    {consumo.estado === 'CARGAR_HABITACION' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handlePagarConsumo(consumo)}
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        💰 Pagar
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
@@ -126,6 +181,47 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
           </div>
         </ScrollArea>
       </div>
+
+      {/* Modal de Pago */}
+      <Dialog open={pagoModalOpen} onOpenChange={setPagoModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Pago</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {consumoAPagar ? (
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
+                <p className="font-semibold">{consumoAPagar.consumoDescripcion}</p>
+                <p className="text-sm text-muted-foreground">{consumoAPagar.habitacionOCliente}</p>
+                <p className="text-lg font-bold text-green-700 dark:text-green-400 mt-2">
+                  Total: {formatCurrency(consumoAPagar.total)}
+                </p>
+              </div>
+            ) : null}
+            <div>
+              <label className="block text-sm font-medium mb-2">Método de Pago</label>
+              <Select value={metodoPago || 'EFECTIVO'} onValueChange={(value) => setMetodoPago(value as MetodoPago)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EFECTIVO">💵 Efectivo</SelectItem>
+                  <SelectItem value="TRANSFERENCIA">🏦 Transferencia</SelectItem>
+                  <SelectItem value="TARJETA">💳 Tarjeta</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPagoModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={confirmarPago} className="bg-green-600 hover:bg-green-700">
+              Confirmar Pago
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

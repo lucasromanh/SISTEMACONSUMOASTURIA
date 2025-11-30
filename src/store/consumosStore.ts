@@ -5,6 +5,7 @@ import type { MovimientoCaja } from '@/types/cajas';
 interface ConsumosStore {
   consumos: Consumo[];
   addConsumo: (consumo: Omit<Consumo, 'id'>) => void;
+  updateConsumo: (id: string, updates: Partial<Consumo>) => void;
   getConsumosByArea: (area: AreaConsumo) => Consumo[];
   getConsumosByDateRange: (startDate: string, endDate: string, area?: AreaConsumo) => Consumo[];
 }
@@ -34,7 +35,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         origen: 'CONSUMO',
         descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
         monto: newConsumo.montoPagado,
-        metodoPago: newConsumo.metodoPago || undefined,
+        metodoPago: newConsumo.metodoPago || 'EFECTIVO',
       });
     } else if (newConsumo.estado === 'CARGAR_HABITACION') {
       // Consumo cargado a habitación (pendiente de cobro)
@@ -46,6 +47,29 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         descripcion: `${newConsumo.consumoDescripcion} - Hab. ${newConsumo.habitacionOCliente} (Pendiente)`,
         monto: newConsumo.total,
         metodoPago: undefined,
+      });
+    }
+  },
+
+  updateConsumo: (id, updates) => {
+    set((state) => ({
+      consumos: state.consumos.map((consumo) =>
+        consumo.id === id ? { ...consumo, ...updates } : consumo
+      ),
+    }));
+
+    // Si se actualiza a PAGADO, agregar movimiento de caja
+    const consumoActualizado = get().consumos.find(c => c.id === id);
+    if (consumoActualizado && updates.estado === 'PAGADO' && consumoActualizado.montoPagado) {
+      const { addMovimiento } = useCajasStore.getState();
+      addMovimiento({
+        fecha: new Date().toISOString().split('T')[0], // Usar fecha actual para el pago
+        area: consumoActualizado.area,
+        tipo: 'INGRESO',
+        origen: 'CONSUMO',
+        descripcion: `Pago habitación - ${consumoActualizado.consumoDescripcion} - ${consumoActualizado.habitacionOCliente}`,
+        monto: consumoActualizado.montoPagado,
+        metodoPago: consumoActualizado.metodoPago || 'EFECTIVO', // Asegurar que tenga método de pago
       });
     }
   },
