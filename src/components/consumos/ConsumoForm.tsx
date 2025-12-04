@@ -92,17 +92,17 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     const n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   };
-  
+
   // Estado para agregar productos
   const [categoria, setCategoria] = useState('');
   const [productoSeleccionado, setProductoSeleccionado] = useState('');
   const [precioUnitario, setPrecioUnitario] = useState('');
   const [cantidad, setCantidad] = useState('1');
-  
+
   // Pedidos activos (sin habitación/cliente aún)
   const [pedidosActivos, setPedidosActivos] = useState<PedidoActivo[]>([]);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState<string | null>(null);
-  
+
   // Modal de cierre de pedido
   const [mostrarModalCierre, setMostrarModalCierre] = useState(false);
   const [pedidoACerrar, setPedidoACerrar] = useState<string | null>(null);
@@ -110,16 +110,16 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   const [habitacionOCliente, setHabitacionOCliente] = useState('');
   const [estado, setEstado] = useState<EstadoConsumo>('CARGAR_HABITACION');
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
-  
+
   // Modal de confirmación de cancelación
   const [mostrarConfirmCancelar, setMostrarConfirmCancelar] = useState(false);
   const [pedidoACancelar, setPedidoACancelar] = useState<string | null>(null);
 
   const productosDisponibles = categoria ? productosPorCategoria[categoria] || [] : [];
-  
+
   // Obtener pedido activo actual
   const pedidoActual = pedidosActivos.find(p => p.id === pedidoSeleccionado);
-  
+
   // Contador para nombres de pedidos
   const [contadorPedidos, setContadorPedidos] = useState(1);
 
@@ -174,12 +174,12 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     };
 
     // Agregar al pedido seleccionado
-    setPedidosActivos(pedidosActivos.map(pedido => 
+    setPedidosActivos(pedidosActivos.map(pedido =>
       pedido.id === pedidoSeleccionado
         ? { ...pedido, productos: [...pedido.productos, nuevoProducto] }
         : pedido
     ));
-    
+
     // Limpiar campos de producto
     setCategoria('');
     setProductoSeleccionado('');
@@ -190,7 +190,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   const handleEliminarProducto = (productoId: string) => {
     if (!pedidoSeleccionado) return;
 
-    setPedidosActivos(pedidosActivos.map(pedido => 
+    setPedidosActivos(pedidosActivos.map(pedido =>
       pedido.id === pedidoSeleccionado
         ? { ...pedido, productos: pedido.productos.filter(p => p.id !== productoId) }
         : pedido
@@ -372,7 +372,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     setPedidoACancelar(pedidoId);
     setMostrarConfirmCancelar(true);
   };
-  
+
   // Confirmar cancelación de pedido
   const confirmarCancelacion = () => {
     if (pedidoACancelar) {
@@ -476,11 +476,10 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   return (
                     <div
                       key={pedido.id}
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${
-                        esActivo
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${esActivo
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
                           : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
-                      }`}
+                        }`}
                       onClick={() => setPedidoSeleccionado(pedido.id)}
                     >
                       <div className="flex justify-between items-start gap-2">
@@ -551,49 +550,49 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   </Badge>
                 )}
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-              <Label htmlFor="categoria" className="text-base font-semibold">
-                Categoría
-              </Label>
-              <Select value={categoria} onValueChange={setCategoria} required>
-                <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500">
-                  <SelectValue placeholder="Seleccione categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.keys(productosPorCategoria).map((cat) => (
-                    <SelectItem key={cat} value={cat} className="text-base">
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <Label htmlFor="categoria" className="text-base font-semibold">
+                    Categoría
+                  </Label>
+                  <Select value={categoria} onValueChange={setCategoria} required>
+                    <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500">
+                      <SelectValue placeholder="Seleccione categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.keys(productosPorCategoria).map((cat) => (
+                        <SelectItem key={cat} value={cat} className="text-base">
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="producto" className="text-base font-semibold">
                     Producto
                   </Label>
-              <Select
-                value={productoSeleccionado}
-                onValueChange={handleProductoChange}
-                disabled={!categoria}
-                required
-              >
-                <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500 disabled:opacity-50">
-                  <SelectValue placeholder={categoria ? "Seleccione producto" : "Primero elija categoría"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {productosDisponibles.map((producto) => (
-                    <SelectItem key={producto.nombre} value={producto.nombre} className="text-base">
-                      <div className="flex justify-between items-center w-full gap-3">
-                        <span>{producto.nombre}</span>
-                        <span className="font-bold text-green-700">${producto.precio}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                  <Select
+                    value={productoSeleccionado}
+                    onValueChange={handleProductoChange}
+                    disabled={!categoria}
+                    required
+                  >
+                    <SelectTrigger className="h-12 text-base border-2 focus:border-hotel-wine-500 disabled:opacity-50">
+                      <SelectValue placeholder={categoria ? "Seleccione producto" : "Primero elija categoría"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {productosDisponibles.map((producto) => (
+                        <SelectItem key={producto.nombre} value={producto.nombre} className="text-base">
+                          <div className="flex justify-between items-center w-full gap-3">
+                            <span>{producto.nombre}</span>
+                            <span className="font-bold text-green-700">${producto.precio}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
 
@@ -601,17 +600,17 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   <Label htmlFor="precio" className="text-base font-semibold">
                     Precio Unitario
                   </Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-                <Input
-                  id="precio"
-                  type="number"
-                  step="0.01"
-                  value={precioUnitario}
-                  onChange={(e) => setPrecioUnitario(e.target.value)}
-                  className="h-12 text-base border-2 focus:border-hotel-wine-500 pl-8"
-                  required
-                />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
+                    <Input
+                      id="precio"
+                      type="number"
+                      step="0.01"
+                      value={precioUnitario}
+                      onChange={(e) => setPrecioUnitario(e.target.value)}
+                      className="h-12 text-base border-2 focus:border-hotel-wine-500 pl-8"
+                      required
+                    />
                   </div>
                 </div>
 
@@ -619,26 +618,26 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   <Label htmlFor="cantidad" className="text-base font-semibold">
                     Cantidad
                   </Label>
-              <Input
-                id="cantidad"
-                type="number"
-                step="0.1"
-                min="0.1"
-                value={cantidad}
-                onChange={(e) => setCantidad(e.target.value)}
+                  <Input
+                    id="cantidad"
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={cantidad}
+                    onChange={(e) => setCantidad(e.target.value)}
                     className="h-12 text-base border-2 focus:border-hotel-wine-500"
                   />
                 </div>
 
                 {/* Botón para agregar producto */}
                 <div className="space-y-2 md:col-span-2">
-                <Button
-                  type="button"
-                  onClick={handleAgregarProducto}
-                  disabled={!productoSeleccionado || !precioUnitario || !cantidad}
-                  className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                >
-                  <Plus className="h-5 w-5 mr-2" />
+                  <Button
+                    type="button"
+                    onClick={handleAgregarProducto}
+                    disabled={!productoSeleccionado || !precioUnitario || !cantidad}
+                    className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
                     Agregar Producto a la Lista
                   </Button>
                 </div>
@@ -655,7 +654,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   {pedidoActual.productos.length} {pedidoActual.productos.length === 1 ? 'item' : 'items'}
                 </Badge>
               </div>
-              
+
               <div className="space-y-2 max-h-60 overflow-y-auto">
                 {pedidoActual.productos.map((producto) => (
                   <div
@@ -722,7 +721,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   Confirmar cierre de pedido
                 </DialogTitle>
               </DialogHeader>
-              
+
               <div className="space-y-4">
                 {/* Total destacado */}
                 {(() => {
@@ -774,7 +773,6 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                       <SelectContent>
                         <SelectItem value="EFECTIVO">💵 Efectivo</SelectItem>
                         <SelectItem value="TRANSFERENCIA">🏦 Transferencia</SelectItem>
-                        <SelectItem value="TARJETA">💳 Tarjeta</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

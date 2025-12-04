@@ -35,6 +35,7 @@ export function ComprobanteTransferenciaModal({
 }: ComprobanteTransferenciaModalProps) {
   const [procesando, setProcesando] = useState(false);
   const [imagenCapturada, setImagenCapturada] = useState<string | null>(null);
+  const [modoManual, setModoManual] = useState(false); // Nuevo estado para carga manual
   const [datosDetectados, setDatosDetectados] = useState<DatosTransferencia>({
     monto: '',
     hora: '',
@@ -45,22 +46,184 @@ export function ComprobanteTransferenciaModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  // Preprocesar imagen para mejorar OCR
+  const preprocesarImagen = (imagenUrl: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        // Crear canvas para procesamiento
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(imagenUrl);
+          return;
+        }
+
+        // Establecer tamaño del canvas
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Dibujar imagen original
+        ctx.drawImage(img, 0, 0);
+
+        // Obtener datos de píxeles
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // 1. Convertir a escala de grises y aumentar contraste
+        for (let i = 0; i < data.length; i += 4) {
+          // Convertir a escala de grises usando luminosidad
+          const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+          // Aumentar contraste (factor 1.5)
+          let adjusted = ((gray - 128) * 1.5) + 128;
+          adjusted = Math.max(0, Math.min(255, adjusted));
+
+          data[i] = adjusted;     // R
+          data[i + 1] = adjusted; // G
+          data[i + 2] = adjusted; // B
+        }
+
+        // 2. Aplicar binarización adaptativa (Otsu's method simplificado)
+        // Calcular histograma
+        const histogram = new Array(256).fill(0);
+        for (let i = 0; i < data.length; i += 4) {
+          histogram[data[i]]++;
+        }
+
+        // Calcular threshold óptimo
+        const total = canvas.width * canvas.height;
+        let sum = 0;
+        for (let i = 0; i < 256; i++) {
+          sum += i * histogram[i];
+        }
+
+        let sumB = 0;
+        let wB = 0;
+        let wF = 0;
+        let maxVariance = 0;
+        let threshold = 0;
+
+        for (let t = 0; t < 256; t++) {
+          wB += histogram[t];
+          if (wB === 0) continue;
+
+          wF = total - wB;
+          if (wF === 0) break;
+
+          sumB += t * histogram[t];
+
+          const mB = sumB / wB;
+          const mF = (sum - sumB) / wF;
+
+          const variance = wB * wF * (mB - mF) * (mB - mF);
+
+          if (variance > maxVariance) {
+            maxVariance = variance;
+            threshold = t;
+          }
+        }
+
+        // Aplicar threshold
+        for (let i = 0; i < data.length; i += 4) {
+          const value = data[i] > threshold ? 255 : 0;
+          data[i] = value;
+          data[i + 1] = value;
+          data[i + 2] = value;
+        }
+
+        // 3. Reducción de ruido (median filter simplificado)
+        const tempData = new Uint8ClampedArray(data);
+        const width = canvas.width;
+        const height = canvas.height;
+
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const idx = (y * width + x) * 4;
+
+            // Obtener vecinos 3x3
+            const neighbors = [];
+            for (let dy = -1; dy <= 1; dy++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const nIdx = ((y + dy) * width + (x + dx)) * 4;
+                neighbors.push(tempData[nIdx]);
+              }
+            }
+
+            // Calcular mediana
+            neighbors.sort((a, b) => a - b);
+            const median = neighbors[4]; // Elemento del medio en array de 9
+
+            data[idx] = median;
+            data[idx + 1] = median;
+            data[idx + 2] = median;
+          }
+        }
+
+        // Aplicar imagen procesada al canvas
+        ctx.putImageData(imageData, 0, 0);
+
+        // Convertir a base64
+        const processedImage = canvas.toDataURL('image/png');
+        resolve(processedImage);
+      };
+      img.src = imagenUrl;
+    });
+  };
+
   // Procesar imagen con OCR
   const procesarImagen = async (imagenUrl: string) => {
     setProcesando(true);
-    
+
     try {
       toast({
         title: '🔍 Procesando comprobante...',
-        description: 'Detectando información automáticamente',
+        description: 'Mejorando imagen y detectando información',
       });
 
-      const worker = await createWorker('spa');
-      const result = await worker.recognize(imagenUrl);
+      // Preprocesar imagen para mejorar OCR
+      const imagenPreprocesada = await preprocesarImagen(imagenUrl);
+
+      // Configurar Tesseract con parámetros optimizados
+      const worker = await createWorker('spa', 1, {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            console.log(`OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        },
+      });
+
+      // Primera pasada con imagen preprocesada y PSM 6
+      console.log('Intentando OCR con imagen preprocesada (PSM 6)...');
+      let result = await worker.recognize(imagenPreprocesada, {
+        rotateAuto: true,
+      });
+      let textoDetectado = result.data.text;
+
+      // Si no se detectó suficiente texto, intentar con imagen original
+      if (textoDetectado.length < 20) {
+        console.log('Poco texto detectado, intentando con imagen original...');
+        result = await worker.recognize(imagenUrl, {
+          rotateAuto: true,
+        });
+        textoDetectado = result.data.text;
+      }
+
+      // Si aún no hay suficiente texto, intentar con más configuraciones
+      if (textoDetectado.length < 20) {
+        console.log('Intentando con configuración alternativa...');
+        result = await worker.recognize(imagenPreprocesada, {
+          rotateAuto: true,
+        });
+        textoDetectado = result.data.text;
+      }
+
       await worker.terminate();
 
+      console.log('Texto detectado por OCR:', textoDetectado);
+
       // Extraer información del texto detectado
-      const datos = extraerDatosDeTexto(result.data.text);
+      const datos = extraerDatosDeTexto(textoDetectado);
       setDatosDetectados(datos);
 
       toast({
@@ -91,7 +254,7 @@ export function ComprobanteTransferenciaModal({
 
     // Normalizar texto
     const lineas = texto.split('\n').map(l => l.toLowerCase().trim());
-    
+
     // Detectar banco ORIGEN (quien envía el dinero)
     // Buscar después de "Banco:" o en contexto de "origen", "de", "desde"
     const bancosMap: Record<string, string> = {
@@ -124,22 +287,22 @@ export function ComprobanteTransferenciaModal({
       'prex': 'Prex',
       'personal pay': 'Personal Pay',
     };
-    
+
     // Buscar Banco ORIGEN
     // El OCR puede no detectar logos, así que buscamos en el texto
     // Si encuentra "Banco:" con un valor, ese es el DESTINO, no el origen
     // El origen debe ser ingresado manualmente si no aparece en el texto
-    
+
     let bancoEncontrado = '';
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
-      
+
       // Si encuentra una línea que dice "Banco: XXXX", ese es el DESTINO
       if (linea.startsWith('banco:')) {
         // Línea con banco destino detectada; no usar como banco origen
         continue;
       }
-      
+
       // Buscar menciones de bancos en otras partes (puede ser el origen)
       for (const [key, value] of Object.entries(bancosMap)) {
         if (linea.includes(key) && !linea.includes('banco:')) {
@@ -149,7 +312,7 @@ export function ComprobanteTransferenciaModal({
       }
       if (bancoEncontrado) break;
     }
-    
+
     // Dejar vacío si no se encontró para que el usuario lo complete manualmente
     datos.banco = bancoEncontrado;
 
@@ -157,7 +320,7 @@ export function ComprobanteTransferenciaModal({
     // NOTA: Mercado Pago muestra el monto en tipografía muy grande que el OCR no siempre detecta
     // En esos casos el campo quedará vacío para completar manualmente
     let montoEncontrado = false;
-    
+
     // Buscar después de "Importe:" o "Monto:"
     if (!montoEncontrado) {
       for (let i = 0; i < lineas.length; i++) {
@@ -178,7 +341,7 @@ export function ComprobanteTransferenciaModal({
         }
       }
     }
-    
+
     // Buscar $ o 's' (OCR confunde $ con s) seguido de número
     if (!montoEncontrado) {
       const matchDolar = texto.match(/[\$s]\s*([\d.,]+)/);
@@ -192,7 +355,7 @@ export function ComprobanteTransferenciaModal({
         }
       }
     }
-    
+
     // Fallback: números de 4-8 dígitos (excluir CUIT formato XX-XXXXXXXX-X)
     if (!montoEncontrado) {
       const todosNumeros = texto.match(/\b(\d{4,8})\b/g);
@@ -202,7 +365,7 @@ export function ComprobanteTransferenciaModal({
           // Verificar que no esté rodeado de guiones (formato CUIT)
           const contexto = texto.substring(texto.indexOf(num) - 5, texto.indexOf(num) + num.length + 5);
           const esCuit = contexto.includes('-') && num.length === 8;
-          
+
           if (!num.startsWith('20') && !esCuit) {
             datos.monto = num;
             montoEncontrado = true;
@@ -218,7 +381,7 @@ export function ComprobanteTransferenciaModal({
       /(\d{1,2}:\d{2})\s*(?:hs|hrs)?/,   // HH:MM
       /(\d{2}\/\d{2}\/\d{4}\s+\d{1,2}:\d{2}:\d{2})/, // fecha completa
     ];
-    
+
     for (const regex of regexHoras) {
       const match = texto.match(regex);
       if (match) {
@@ -233,10 +396,10 @@ export function ComprobanteTransferenciaModal({
 
     // Detectar número de operación
     let operacionEncontrada = false;
-    
+
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
-      
+
       // Naranja X: "Código de transacción" (UUID) - ya está en minúsculas
       if (linea.includes('codigo de transaccion') || linea.includes('código de transacción')) {
         const siguiente = lineas[i + 1] || '';
@@ -248,7 +411,7 @@ export function ComprobanteTransferenciaModal({
           break;
         }
       }
-      
+
       // Mercado Pago: "Número de operación de Mercado Pago"
       if (linea.includes('operacion') && linea.includes('mercado pago')) {
         const siguiente = lineas[i + 1] || '';
@@ -259,11 +422,11 @@ export function ComprobanteTransferenciaModal({
           break;
         }
       }
-      
+
       // Otros bancos: "N° de Operación" o "n* de operación"
-      if (linea.includes('operacion') && 
-          !linea.includes('mercado pago') &&
-          !linea.includes('transaccion')) {
+      if (linea.includes('operacion') &&
+        !linea.includes('mercado pago') &&
+        !linea.includes('transaccion')) {
         // El número puede estar en la misma línea o en la siguiente
         const textoOperacion = linea + ' ' + (lineas[i + 1] || '');
         const matchNum = textoOperacion.match(/(\d{10,})/);
@@ -274,7 +437,7 @@ export function ComprobanteTransferenciaModal({
         }
       }
     }
-    
+
     // Fallback: número de 11-16 dígitos (excluyendo CBU de 22)
     if (!operacionEncontrada) {
       const numeros = texto.match(/\b(\d{11,16})\b/g);
@@ -287,7 +450,7 @@ export function ComprobanteTransferenciaModal({
     // Buscar específicamente "Alias Destino:" o "CBU/CVU Destino:"
     for (let i = 0; i < lineas.length; i++) {
       const linea = lineas[i];
-      
+
       // Buscar "Alias Destino:" o similar
       if (linea.includes('alias') && linea.includes('destino')) {
         // El alias está en la siguiente línea o después de ":"
@@ -299,7 +462,7 @@ export function ComprobanteTransferenciaModal({
           break;
         }
       }
-      
+
       // Buscar "CBU/CVU Destino:" o similar
       if ((linea.includes('cbu') || linea.includes('cvu')) && linea.includes('destino')) {
         // Buscar 22 dígitos en esta línea o la siguiente
@@ -311,7 +474,7 @@ export function ComprobanteTransferenciaModal({
         }
       }
     }
-    
+
     // Fallback: buscar primer alias (palabra alfanumérica) o CBU de 22 dígitos
     if (!datos.aliasCbu) {
       // Buscar 22 dígitos
@@ -366,7 +529,16 @@ export function ComprobanteTransferenciaModal({
     reader.onload = (event) => {
       const imagenUrl = event.target?.result as string;
       setImagenCapturada(imagenUrl);
-      procesarImagen(imagenUrl);
+
+      // Solo procesar con OCR si NO está en modo manual
+      if (!modoManual) {
+        procesarImagen(imagenUrl);
+      } else {
+        toast({
+          title: '📸 Imagen cargada',
+          description: 'Complete los datos manualmente',
+        });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -417,28 +589,58 @@ export function ComprobanteTransferenciaModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Botones de captura */}
+          {/* Toggle entre modo OCR y modo manual */}
           {!imagenCapturada && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
               <Button
                 type="button"
-                variant="default"
-                className="flex-1 h-12 gap-2"
-                onClick={handleCapturarFoto}
+                variant={!modoManual ? "default" : "outline"}
+                className="flex-1 h-10 text-sm"
+                onClick={() => setModoManual(false)}
               >
-                <Camera className="h-4 w-4" />
-                Tomar Foto
+                🤖 OCR Automático
               </Button>
               <Button
                 type="button"
-                variant="outline"
-                className="flex-1 h-12 gap-2"
-                onClick={handleSubirImagen}
+                variant={modoManual ? "default" : "outline"}
+                className="flex-1 h-10 text-sm"
+                onClick={() => setModoManual(true)}
               >
-                <Upload className="h-4 w-4" />
-                Subir
+                ✍️ Carga Manual
               </Button>
             </div>
+          )}
+
+          {/* Botones de captura */}
+          {!imagenCapturada && (
+            <>
+              {modoManual && (
+                <div className="text-sm text-muted-foreground bg-yellow-50 dark:bg-yellow-950/30 p-3 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                  <p className="font-semibold text-yellow-800 dark:text-yellow-400">Modo Manual Activado</p>
+                  <p className="text-xs mt-1">Sube la foto y completa los datos manualmente. El OCR no se ejecutará.</p>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  className="flex-1 h-12 gap-2"
+                  onClick={handleCapturarFoto}
+                >
+                  <Camera className="h-4 w-4" />
+                  Tomar Foto
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1 h-12 gap-2"
+                  onClick={handleSubirImagen}
+                >
+                  <Upload className="h-4 w-4" />
+                  Subir
+                </Button>
+              </div>
+            </>
           )}
 
           {/* Input oculto para archivo */}
