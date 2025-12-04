@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuthStore } from '@/store/authStore';
 import { Hotel } from 'lucide-react';
+import { InstallPWAButton } from '@/components/common/InstallPWAButton';
 
 export function LoginPage() {
   const [username, setUsername] = useState('');
@@ -97,6 +98,7 @@ export function LoginPage() {
           </div>
         </CardContent>
       </Card>
+      <InstallPWAButton />
     </div>
   );
 }
