@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { RoleBadge } from '@/components/common/RoleBadge';
 import { ModeToggle } from '@/components/common/ModeToggle';
 import { useAuthStore } from '@/store/authStore';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Sidebar } from '@/components/layout/Sidebar';
 import {
   DropdownMenu,
@@ -36,6 +36,10 @@ export function TopBar({ sidebarOpen, setSidebarOpen }: TopBarProps) {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-64 p-0">
+              <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+              <SheetDescription className="sr-only">
+                Navegue por las diferentes secciones del sistema
+              </SheetDescription>
               <Sidebar onNavigate={() => setSidebarOpen(false)} />
             </SheetContent>
           </Sheet>
@@ -57,10 +61,10 @@ export function TopBar({ sidebarOpen, setSidebarOpen }: TopBarProps) {
             <ModeToggle />
           </div>
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={logout} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={logout}
             title="Cerrar sesión"
             className="hidden md:flex"
           >

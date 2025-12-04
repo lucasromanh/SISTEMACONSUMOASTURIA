@@ -32,33 +32,33 @@ export function AdminDashboardPage() {
         end: format(customEndDate, 'yyyy-MM-dd'),
       };
     }
-    
+
     if (periodo === 'lastWeek') {
       const today = new Date();
       const lastWeekEnd = new Date(today);
       lastWeekEnd.setDate(today.getDate() - today.getDay()); // Domingo de esta semana
       lastWeekEnd.setDate(lastWeekEnd.getDate() - 1); // Sábado de semana pasada
-      
+
       const lastWeekStart = new Date(lastWeekEnd);
       lastWeekStart.setDate(lastWeekEnd.getDate() - 6); // Lunes de semana pasada
-      
+
       return {
         start: format(lastWeekStart, 'yyyy-MM-dd'),
         end: format(lastWeekEnd, 'yyyy-MM-dd'),
       };
     }
-    
+
     if (periodo === 'lastMonth') {
       const today = new Date();
       const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
       const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
-      
+
       return {
         start: format(lastMonth, 'yyyy-MM-dd'),
         end: format(lastMonthEnd, 'yyyy-MM-dd'),
       };
     }
-    
+
     return getDateRangeByPeriod(periodo as 'day' | 'week' | 'month');
   }, [periodo, customStartDate, customEndDate]);
 
@@ -123,207 +123,207 @@ export function AdminDashboardPage() {
   return (
     <div className="w-full bg-background">
       <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 w-full">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-hotel-wine-900 dark:text-hotel-wine-400">Dashboard Global</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">Vista general de todas las áreas</p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-hotel-wine-900 dark:text-hotel-wine-400">Dashboard Global</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">Vista general de todas las áreas</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoPreset)}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="day">📅 Hoy</SelectItem>
+                  <SelectItem value="week">📆 Esta Semana</SelectItem>
+                  <SelectItem value="lastWeek">⏪ Semana Anterior</SelectItem>
+                  <SelectItem value="month">📅 Este Mes</SelectItem>
+                  <SelectItem value="lastMonth">⏪ Mes Anterior</SelectItem>
+                  <SelectItem value="custom">🗓️ Rango Personalizado</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {periodo === 'custom' && (
+                <div className="flex gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full sm:w-[200px] justify-start text-left font-normal",
+                          !customStartDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customStartDate ? format(customStartDate, "d 'de' MMM", { locale: es }) : "Fecha inicio"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customStartDate}
+                        onSelect={setCustomStartDate}
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full sm:w-[200px] justify-start text-left font-normal",
+                          !customEndDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {customEndDate ? format(customEndDate, "d 'de' MMM", { locale: es }) : "Fecha fin"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={customEndDate}
+                        onSelect={setCustomEndDate}
+                        locale={es}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Select value={periodo} onValueChange={(v) => setPeriodo(v as PeriodoPreset)}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="day">📅 Hoy</SelectItem>
-                <SelectItem value="week">📆 Esta Semana</SelectItem>
-                <SelectItem value="lastWeek">⏪ Semana Anterior</SelectItem>
-                <SelectItem value="month">📅 Este Mes</SelectItem>
-                <SelectItem value="lastMonth">⏪ Mes Anterior</SelectItem>
-                <SelectItem value="custom">🗓️ Rango Personalizado</SelectItem>
-              </SelectContent>
-            </Select>
-            
-            {periodo === 'custom' && (
-              <div className="flex gap-2">
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full sm:w-[200px] justify-start text-left font-normal",
-                        !customStartDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customStartDate ? format(customStartDate, "d 'de' MMM", { locale: es }) : "Fecha inicio"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customStartDate}
-                      onSelect={setCustomStartDate}
-                      locale={es}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full sm:w-[200px] justify-start text-left font-normal",
-                        !customEndDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {customEndDate ? format(customEndDate, "d 'de' MMM", { locale: es }) : "Fecha fin"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={customEndDate}
-                      onSelect={setCustomEndDate}
-                      locale={es}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+
+          {/* Mostrar rango de fechas seleccionado */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarIcon className="h-4 w-4" />
+            <span>
+              Mostrando datos del {format(new Date(dateRange.start), "d 'de' MMMM 'de' yyyy", { locale: es })}
+              {' '} al {format(new Date(dateRange.end), "d 'de' MMMM 'de' yyyy", { locale: es })}
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
+              <DollarSign className="h-4 w-4 text-hotel-wine-600 dark:text-hotel-wine-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-hotel-wine-800 dark:text-hotel-wine-300">
+                {formatCurrency(globalStats.total)}
               </div>
-            )}
+              <p className="text-xs text-muted-foreground mt-1">{consumos.length} consumos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Ingresos</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-400">
+                {formatCurrency(globalStats.totalIngresos)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Efectivo + Transferencias</p>
+            </CardContent>
+          </Card>
+
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Egresos</CardTitle>
+              <Wallet className="h-4 w-4 text-red-600 dark:text-red-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-700 dark:text-red-400">
+                {formatCurrency(globalStats.totalEgresos)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Gastos del período</p>
+            </CardContent>
+          </Card>
+
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Balance Neto</CardTitle>
+              <BarChart className="h-4 w-4 text-hotel-gold-600 dark:text-hotel-gold-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-hotel-gold-700 dark:text-hotel-gold-400">
+                {formatCurrency(globalStats.totalNeto)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Ingresos - Egresos</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="w-full">
+          <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Resumen por Área</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+            {statsByArea.map((stat) => (
+              <Card key={stat.area} className="hover:shadow-lg transition-shadow w-full">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="secondary" className="text-xs sm:text-sm">{areaLabels[stat.area]}</Badge>
+                    <span className="text-xs text-muted-foreground">{stat.cantidad} ventas</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-2 sm:space-y-3">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-muted-foreground">Total:</span>
+                      <span className="text-base sm:text-lg font-bold">{formatCurrency(stat.total)}</span>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <span className="text-xs sm:text-sm text-green-700 dark:text-green-400">Pagado:</span>
+                      <span className="text-xs sm:text-sm font-semibold text-green-700 dark:text-green-400">
+                        {formatCurrency(stat.totalPagado)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-blue-700 dark:text-blue-400">Habitación:</span>
+                      <span className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-400">
+                        {formatCurrency(stat.totalHabitacion)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </div>
-        
-        {/* Mostrar rango de fechas seleccionado */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <CalendarIcon className="h-4 w-4" />
-          <span>
-            Mostrando datos del {format(new Date(dateRange.start), "d 'de' MMMM 'de' yyyy", { locale: es })}
-            {' '} al {format(new Date(dateRange.end), "d 'de' MMMM 'de' yyyy", { locale: es })}
-          </span>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
-            <DollarSign className="h-4 w-4 text-hotel-wine-600 dark:text-hotel-wine-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-hotel-wine-800 dark:text-hotel-wine-300">
-              {formatCurrency(globalStats.total)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">{consumos.length} consumos</p>
-          </CardContent>
-        </Card>
-
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Ingresos</CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-              {formatCurrency(globalStats.totalIngresos)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Efectivo + Transferencias</p>
-          </CardContent>
-        </Card>
-
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Egresos</CardTitle>
-            <Wallet className="h-4 w-4 text-red-600 dark:text-red-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700 dark:text-red-400">
-              {formatCurrency(globalStats.totalEgresos)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Gastos del período</p>
-          </CardContent>
-        </Card>
-
-        <Card className="w-full">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Balance Neto</CardTitle>
-            <BarChart className="h-4 w-4 text-hotel-gold-600 dark:text-hotel-gold-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-hotel-gold-700 dark:text-hotel-gold-400">
-              {formatCurrency(globalStats.totalNeto)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Ingresos - Egresos</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="w-full">
-        <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Resumen por Área</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
-          {statsByArea.map((stat) => (
-            <Card key={stat.area} className="hover:shadow-lg transition-shadow w-full">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs sm:text-sm">{areaLabels[stat.area]}</Badge>
-                  <span className="text-xs text-muted-foreground">{stat.cantidad} ventas</span>
-                </div>
+        <Tabs defaultValue="consumos" className="space-y-3 sm:space-y-4 w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="consumos" className="text-xs sm:text-sm">Todos los Consumos</TabsTrigger>
+            <TabsTrigger value="movimientos" className="text-xs sm:text-sm">Movimientos de Caja</TabsTrigger>
+          </TabsList>
+          <TabsContent value="consumos">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Consumos de Todas las Áreas</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2 sm:space-y-3">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Total:</span>
-                    <span className="text-base sm:text-lg font-bold">{formatCurrency(stat.total)}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-2 border-t">
-                    <span className="text-xs sm:text-sm text-green-700 dark:text-green-400">Pagado:</span>
-                    <span className="text-xs sm:text-sm font-semibold text-green-700 dark:text-green-400">
-                      {formatCurrency(stat.totalPagado)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs sm:text-sm text-blue-700 dark:text-blue-400">Habitación:</span>
-                    <span className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-400">
-                      {formatCurrency(stat.totalHabitacion)}
-                    </span>
-                  </div>
-                </div>
+              <CardContent className="p-0">
+                <ConsumosTable consumos={consumos} />
               </CardContent>
             </Card>
-          ))}
-        </div>
-      </div>
-
-      <Tabs defaultValue="consumos" className="space-y-3 sm:space-y-4 w-full">
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger value="consumos" className="text-xs sm:text-sm">Todos los Consumos</TabsTrigger>
-          <TabsTrigger value="movimientos" className="text-xs sm:text-sm">Movimientos de Caja</TabsTrigger>
-        </TabsList>
-        <TabsContent value="consumos">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Consumos de Todas las Áreas</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-6">
-              <ConsumosTable consumos={consumos} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="movimientos">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle className="text-base sm:text-lg">Movimientos de Caja de Todas las Áreas</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 sm:p-6">
-              <CajaDetalleTabla movimientos={movimientos} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+          <TabsContent value="movimientos">
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="text-base sm:text-lg">Movimientos de Caja de Todas las Áreas</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <CajaDetalleTabla movimientos={movimientos} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

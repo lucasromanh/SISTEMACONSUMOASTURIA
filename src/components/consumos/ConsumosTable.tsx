@@ -53,55 +53,55 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
   return (
     <>
       {/* Vista Desktop */}
-      <div className="hidden md:block">
-        <ScrollArea className="h-[600px] rounded-md border">
+      <div className="hidden md:block w-full">
+        <ScrollArea className="h-[600px] w-full rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Habitación/Cliente</TableHead>
-                <TableHead>Consumo</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead className="text-right">Cantidad</TableHead>
-                <TableHead className="text-right">Precio Unit.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Método Pago</TableHead>
-                <TableHead>Acciones</TableHead>
+                <TableHead className="text-xs lg:text-sm">Fecha</TableHead>
+                <TableHead className="text-xs lg:text-sm">Habitación/Cliente</TableHead>
+                <TableHead className="text-xs lg:text-sm">Consumo</TableHead>
+                <TableHead className="hidden xl:table-cell text-xs lg:text-sm">Categoría</TableHead>
+                <TableHead className="hidden lg:table-cell text-right text-xs lg:text-sm">Cantidad</TableHead>
+                <TableHead className="hidden lg:table-cell text-right text-xs lg:text-sm">Precio Unit.</TableHead>
+                <TableHead className="text-right text-xs lg:text-sm">Total</TableHead>
+                <TableHead className="text-xs lg:text-sm">Estado</TableHead>
+                <TableHead className="text-xs lg:text-sm">Método Pago</TableHead>
+                <TableHead className="text-xs lg:text-sm">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {consumos.map((consumo) => (
                 <TableRow key={consumo.id}>
-                  <TableCell className="whitespace-nowrap">{formatDate(consumo.fecha)}</TableCell>
-                  <TableCell className="font-medium">{consumo.habitacionOCliente}</TableCell>
-                  <TableCell>{consumo.consumoDescripcion}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{consumo.categoria}</Badge>
+                  <TableCell className="whitespace-nowrap text-xs lg:text-sm">{formatDate(consumo.fecha)}</TableCell>
+                  <TableCell className="font-medium text-xs lg:text-sm">{consumo.habitacionOCliente}</TableCell>
+                  <TableCell className="text-xs lg:text-sm">{consumo.consumoDescripcion}</TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    <Badge variant="outline" className="text-xs">{consumo.categoria}</Badge>
                   </TableCell>
-                  <TableCell className="text-right">{consumo.cantidad}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(consumo.precioUnitario)}</TableCell>
-                  <TableCell className="text-right font-semibold">{formatCurrency(consumo.total)}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-right text-xs lg:text-sm">{consumo.cantidad}</TableCell>
+                  <TableCell className="hidden lg:table-cell text-right text-xs lg:text-sm">{formatCurrency(consumo.precioUnitario)}</TableCell>
+                  <TableCell className="text-right font-semibold text-xs lg:text-sm">{formatCurrency(consumo.total)}</TableCell>
                   <TableCell>
                     <StatusBadge estado={consumo.estado} />
                   </TableCell>
                   <TableCell>
                     {consumo.estado === 'CARGAR_HABITACION' ? (
-                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                        Cargar a Habitación
+                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs whitespace-nowrap">
+                        Habitación
                       </Badge>
                     ) : consumo.metodoPago ? (
-                      <Badge variant="secondary">{consumo.metodoPago}</Badge>
+                      <Badge variant="secondary" className="text-xs">{consumo.metodoPago}</Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="w-[120px] px-2">
                     {consumo.estado === 'CARGAR_HABITACION' && (
                       <Button
                         size="sm"
                         onClick={() => handlePagarConsumo(consumo)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-green-600 hover:bg-green-700 text-white text-[10px] px-2 h-7 whitespace-nowrap"
                       >
                         💰 Pagar
                       </Button>
@@ -138,7 +138,7 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
                     <p className="text-muted-foreground">Fecha</p>
