@@ -1,9 +1,12 @@
 /**
- * Obtiene la fecha de hoy en formato ISO (YYYY-MM-DD)
+ * Obtiene la fecha de hoy en formato ISO (YYYY-MM-DD) usando hora local
  */
 export function getTodayISO(): string {
   const now = new Date();
-  return now.toISOString().split('T')[0];
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -43,10 +46,13 @@ export function getEndOfMonth(): Date {
 }
 
 /**
- * Convierte una fecha a formato ISO string (YYYY-MM-DD)
+ * Convierte una fecha a formato ISO string (YYYY-MM-DD) usando hora local
  */
 export function toISODate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 /**
@@ -56,7 +62,7 @@ export function isBetweenDates(date: string, startDate: string, endDate: string)
   const d = new Date(date);
   const start = new Date(startDate);
   const end = new Date(endDate);
-  
+
   return d >= start && d <= end;
 }
 
@@ -67,7 +73,7 @@ export function getDateRangeByPeriod(period: 'day' | 'week' | 'month'): { start:
   const today = new Date();
   let start: Date;
   let end: Date = today;
-  
+
   switch (period) {
     case 'day':
       start = today;
@@ -81,7 +87,7 @@ export function getDateRangeByPeriod(period: 'day' | 'week' | 'month'): { start:
       end = getEndOfMonth();
       break;
   }
-  
+
   return {
     start: toISODate(start),
     end: toISODate(end),

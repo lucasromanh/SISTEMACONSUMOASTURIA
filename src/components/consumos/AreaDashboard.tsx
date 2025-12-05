@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+﻿import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
@@ -9,9 +9,11 @@ import type { AreaConsumo } from '@/types/consumos';
 import type { MovimientoCaja } from '@/types/cajas';
 import { formatCurrency } from '@/utils/formatters';
 import { exportToCsv } from '@/utils/exportToCsv';
-import { DollarSign, ArrowUpCircle, ArrowDownCircle, ShoppingCart } from 'lucide-react';
+import { DollarSign, ArrowUpCircle, ArrowDownCircle, ShoppingCart, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface AreaDashboardProps {
   area: AreaConsumo;
@@ -21,6 +23,10 @@ interface AreaDashboardProps {
 
 export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashboardProps) {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
+  const [comprobanteModalOpen, setComprobanteModalOpen] = useState(false);
+  const [imagenComprobante, setImagenComprobante] = useState<string>('');
+  const [transaccionSeleccionada, setTransaccionSeleccionada] = useState<any | null>(null);
+
   const { consumos: allConsumos } = useConsumosStore();
   const { movimientos: allMovimientos } = useCajasStore();
   const { getGastosByDateRange } = useStockStore();
@@ -30,22 +36,22 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     return format(fechaSeleccionada, 'yyyy-MM-dd');
   }, [fechaSeleccionada]);
 
-  // Filtrar consumos del día seleccionado
+  // Filtrar consumos del dÃ­a seleccionado
   const consumos = useMemo(() => {
     return allConsumos.filter((c) => c.fecha === fechaISO && c.area === area);
   }, [fechaISO, area, allConsumos]);
 
-  // Filtrar movimientos del día seleccionado
+  // Filtrar movimientos del dÃ­a seleccionado
   const movimientos = useMemo(() => {
     return allMovimientos.filter((m: MovimientoCaja) => m.fecha === fechaISO && m.area === area);
   }, [fechaISO, area, allMovimientos]);
 
-  // Filtrar gastos del día seleccionado
+  // Filtrar gastos del dÃ­a seleccionado
   const gastos = useMemo(() => {
     return getGastosByDateRange(fechaISO, fechaISO, area);
   }, [fechaISO, area, getGastosByDateRange]);
 
-  // Crear lista de transacciones del día ordenadas
+  // Crear lista de transacciones del dÃ­a ordenadas
   const transaccionesDia = useMemo(() => {
     const transacciones: Array<{
       tipo: 'INGRESO_INICIAL' | 'CONSUMO' | 'GASTO';
@@ -104,7 +110,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
     // 3. Agregar consumos que no tengan movimiento asociado (evitar duplicados)
     consumos.forEach((c) => {
-      // Buscar si existe un movimiento con la misma descripción y monto
+      // Buscar si existe un movimiento con la misma descripciÃ³n y monto
       const movimientoExistente = movimientos.find((m) => m.descripcion && m.descripcion.includes(c.consumoDescripcion) && Math.abs(m.monto - (c.montoPagado || c.total)) < 0.01);
       if (!movimientoExistente) {
         const hora = new Date(c.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
@@ -136,7 +142,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     return transacciones;
   }, [consumos, movimientos, gastos]);
 
-  // Calcular totales del día
+  // Calcular totales del dÃ­a
   const totalesDia = useMemo(() => {
     // Usar movimientos como fuente de verdad para totales financieros
     const ingresoInicial = movimientos
@@ -151,7 +157,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + m.monto, 0);
 
-    // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
+    // Consumos cargados a habitaciÃ³n (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
       .reduce((sum, c) => sum + c.total, 0);
@@ -187,14 +193,14 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       `consumos-${area.toLowerCase()}-${fechaISO}`,
       [
         { key: 'fecha', label: 'Fecha' },
-        { key: 'habitacionOCliente', label: 'Habitación/Cliente' },
+        { key: 'habitacionOCliente', label: 'HabitaciÃ³n/Cliente' },
         { key: 'consumoDescripcion', label: 'Consumo' },
-        { key: 'categoria', label: 'Categoría' },
+        { key: 'categoria', label: 'CategorÃ­a' },
         { key: 'cantidad', label: 'Cantidad' },
         { key: 'precioUnitario', label: 'Precio Unitario' },
         { key: 'total', label: 'Total' },
         { key: 'estado', label: 'Estado' },
-        { key: 'metodoPago', label: 'Método de Pago' },
+        { key: 'metodoPago', label: 'MÃ©todo de Pago' },
       ]
     );
   };
@@ -202,140 +208,178 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
   return (
     <div className="w-full bg-background">
       <div className="px-3 py-4 sm:p-6 space-y-4 sm:space-y-6 w-full">
-      {/* Header con selector de fecha */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-hotel-wine-900 dark:text-hotel-wine-400">{titulo}</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">Gestión de consumos por día</p>
-        </div>
-        <div className="w-full sm:w-auto">
-          <DatePicker 
-            date={fechaSeleccionada} 
-            onDateChange={setFechaSeleccionada}
-            className="w-full sm:w-[280px]"
-          />
-        </div>
-      </div>
-
-      {/* Formulario de registro */}
-      <ConsumoForm area={area} productosPorCategoria={productosPorCategoria} />
-
-      {/* Resumen del día */}
-      <Card className="bg-gradient-to-br from-hotel-wine-50 to-hotel-wine-100 dark:from-zinc-900 dark:to-zinc-800 border-2 border-hotel-wine-200 dark:border-zinc-700 w-full">
-        <CardHeader>
-          <CardTitle className="text-base sm:text-xl flex items-center gap-2">
-            <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
-            <span className="line-clamp-2 sm:line-clamp-1">
-              Resumen del Día - {format(fechaSeleccionada, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 sm:space-y-4 w-full">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full">
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Ingreso Inicial</p>
-              <p className="text-lg sm:text-2xl font-bold text-amber-700 dark:text-amber-400">{formatCurrency(totalesDia.ingresoInicial)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Efectivo</p>
-              <p className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-400">{formatCurrency(totalesDia.consumosEfectivo)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Transferencia</p>
-              <p className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosTransferencia)}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Gastos</p>
-              <p className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-400">-{formatCurrency(totalesDia.gastosEfectivo)}</p>
-            </div>
+        {/* Header con selector de fecha */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-hotel-wine-900 dark:text-hotel-wine-400">{titulo}</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">GestiÃ³n de consumos por dÃ­a</p>
           </div>
-          
-          <div className="pt-3 sm:pt-4 border-t-2 border-hotel-wine-300 dark:border-zinc-600">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <div>
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Efectivo Final en Caja</p>
-                <p className="text-xs text-muted-foreground mt-1">Ingreso Inicial + Consumos Efectivo - Gastos</p>
+          <div className="w-full sm:w-auto">
+            <DatePicker
+              date={fechaSeleccionada}
+              onDateChange={setFechaSeleccionada}
+              className="w-full sm:w-[280px]"
+            />
+          </div>
+        </div>
+
+        {/* Formulario de registro */}
+        <ConsumoForm area={area} productosPorCategoria={productosPorCategoria} />
+
+        {/* Resumen del dÃ­a */}
+        <Card className="bg-gradient-to-br from-hotel-wine-50 to-hotel-wine-100 dark:from-zinc-900 dark:to-zinc-800 border-2 border-hotel-wine-200 dark:border-zinc-700 w-full">
+          <CardHeader>
+            <CardTitle className="text-base sm:text-xl flex items-center gap-2">
+              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="line-clamp-2 sm:line-clamp-1">
+                Resumen del DÃ­a - {format(fechaSeleccionada, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 sm:space-y-4 w-full">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 w-full">
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Ingreso Inicial</p>
+                <p className="text-lg sm:text-2xl font-bold text-amber-700 dark:text-amber-400">{formatCurrency(totalesDia.ingresoInicial)}</p>
               </div>
-              <p className="text-3xl sm:text-4xl font-bold text-hotel-wine-800 dark:text-hotel-wine-400">{formatCurrency(totalesDia.saldoFinal)}</p>
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Efectivo</p>
+                <p className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-400">{formatCurrency(totalesDia.consumosEfectivo)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Transferencia</p>
+                <p className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosTransferencia)}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Gastos</p>
+                <p className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-400">-{formatCurrency(totalesDia.gastosEfectivo)}</p>
+              </div>
             </div>
-          </div>
 
-          {totalesDia.consumosCargados > 0 && (
-            <div className="pt-2">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Cargado a Habitación (no incluido en caja)</p>
-              <p className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosCargados)}</p>
+            <div className="pt-3 sm:pt-4 border-t-2 border-hotel-wine-300 dark:border-zinc-600">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Efectivo Final en Caja</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ingreso Inicial + Consumos Efectivo - Gastos</p>
+                </div>
+                <p className="text-3xl sm:text-4xl font-bold text-hotel-wine-800 dark:text-hotel-wine-400">{formatCurrency(totalesDia.saldoFinal)}</p>
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Detalle de transacciones */}
-      <Card className="w-full">
-        <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <CardTitle className="text-base sm:text-lg">Detalle de Transacciones del Día</CardTitle>
-          <ExportButtons onExportCSV={handleExportCSV} disabled={transaccionesDia.length === 0} />
-        </CardHeader>
-        <CardContent className="p-3 sm:p-6">
-          {transaccionesDia.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm sm:text-base">No hay transacciones registradas para este día</p>
-            </div>
-          ) : (
-            <div className="space-y-2 sm:space-y-3 w-full">
-              {transaccionesDia.map((transaccion, index) => (
-                <div
-                  key={index}
-                  className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border w-full ${
-                    transaccion.tipo === 'INGRESO_INICIAL'
+            {totalesDia.consumosCargados > 0 && (
+              <div className="pt-2">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Cargado a HabitaciÃ³n (no incluido en caja)</p>
+                <p className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosCargados)}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Detalle de transacciones */}
+        <Card className="w-full">
+          <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <CardTitle className="text-base sm:text-lg">Detalle de Transacciones del DÃ­a</CardTitle>
+            <ExportButtons onExportCSV={handleExportCSV} disabled={transaccionesDia.length === 0} />
+          </CardHeader>
+          <CardContent className="p-3 sm:p-6">
+            {transaccionesDia.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm sm:text-base">No hay transacciones registradas para este dÃ­a</p>
+              </div>
+            ) : (
+              <div className="space-y-2 sm:space-y-3 w-full">
+                {transaccionesDia.map((transaccion, index) => (
+                  <div
+                    key={index}
+                    className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border w-full ${transaccion.tipo === 'INGRESO_INICIAL'
                       ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'
                       : transaccion.tipo === 'CONSUMO'
-                      ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
-                      : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
-                  }`}
-                >
-                  <div className="flex items-start gap-3 flex-1 w-full">
-                    <div className="flex-shrink-0">{transaccion.icono}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm sm:text-base break-words">{transaccion.descripcion}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs sm:text-sm text-muted-foreground">
-                          {transaccion.metodoPago === 'EFECTIVO' && '💵 Efectivo'}
-                          {transaccion.metodoPago === 'TRANSFERENCIA' && '🏦 Transferencia'}
-                          {transaccion.metodoPago === 'CARGAR_HABITACION' && '🏨 Cargado a Habitación'}
-                        </p>
-                        {transaccion.metodoPago === 'TRANSFERENCIA' && (transaccion as any).datosTransferencia?.imagenComprobante && (
-                          <button
-                            onClick={() => {
-                              const img = (transaccion as any).datosTransferencia.imagenComprobante;
-                              const w = window.open();
-                              if (w) {
-                                w.document.write(`<img src="${img}" style="max-width:100%"/>`);
-                              }
-                            }}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            Ver comprobante
-                          </button>
-                        )}
+                        ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
+                      }`}
+                  >
+                    <div className="flex items-start gap-3 flex-1 w-full">
+                      <div className="flex-shrink-0">{transaccion.icono}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm sm:text-base break-words">{transaccion.descripcion}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">
+                            {transaccion.metodoPago === 'EFECTIVO' && 'ðŸ’µ Efectivo'}
+                            {transaccion.metodoPago === 'TRANSFERENCIA' && 'ðŸ¦ Transferencia'}
+                            {transaccion.metodoPago === 'CARGAR_HABITACION' && 'ðŸ¨ Cargado a HabitaciÃ³n'}
+                          </p>
+                          {transaccion.metodoPago === 'TRANSFERENCIA' && (transaccion as any).datosTransferencia?.imagenComprobante && (
+                            <button
+                              onClick={() => {
+                                const img = (transaccion as any).datosTransferencia.imagenComprobante;
+                                setImagenComprobante(img);
+                                setTransaccionSeleccionada(transaccion);
+                                setComprobanteModalOpen(true);
+                              }}
+                              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              Ver comprobante
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right w-full sm:w-auto">
-                    <p className={`text-xl sm:text-2xl font-bold ${
-                      transaccion.tipo === 'GASTO'
+                    <div className="text-right w-full sm:w-auto">
+                      <p className={`text-xl sm:text-2xl font-bold ${transaccion.tipo === 'GASTO'
                         ? 'text-red-700 dark:text-red-400'
                         : 'text-green-700 dark:text-green-400'
-                    }`}>
-                      {transaccion.tipo === 'GASTO' ? '-' : '+'}{formatCurrency(transaccion.monto)}
-                    </p>
+                        }`}>
+                        {transaccion.tipo === 'GASTO' ? '-' : '+'}{formatCurrency(transaccion.monto)}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>      </div>
+
+      {/* Modal de Comprobante */}
+      <Dialog open={comprobanteModalOpen} onOpenChange={setComprobanteModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0">
+          <DialogHeader className="p-6 pb-4">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg font-semibold">
+                 Comprobante de Transferencia
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setComprobanteModalOpen(false)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
-      </div>
+            {transaccionSeleccionada && (
+              <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                <p><strong>Monto:</strong> {formatCurrency(transaccionSeleccionada.monto)}</p>
+                <p><strong>Hora:</strong> {transaccionSeleccionada.hora}</p>
+                {transaccionSeleccionada.datosTransferencia?.numeroOperacion && (
+                  <p><strong>N° Operación:</strong> {transaccionSeleccionada.datosTransferencia.numeroOperacion}</p>
+                )}
+                {transaccionSeleccionada.datosTransferencia?.banco && (
+                  <p><strong>Banco:</strong> {transaccionSeleccionada.datosTransferencia.banco}</p>
+                )}
+              </div>
+            )}
+          </DialogHeader>
+          <div className="px-6 pb-6">
+            <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-4 overflow-auto max-h-[60vh]">
+              <img
+                src={imagenComprobante}
+                alt="Comprobante de transferencia"
+                className="w-full h-auto rounded"
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
