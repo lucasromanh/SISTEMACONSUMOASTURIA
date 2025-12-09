@@ -1,30 +1,16 @@
 import { AreaDashboard } from '@/components/consumos/AreaDashboard';
-
-const productos = {
-  Tragos: [
-    { nombre: 'Piña Colada', precio: 1200 },
-    { nombre: 'Mojito', precio: 1000 },
-    { nombre: 'Margarita', precio: 1100 },
-    { nombre: 'Caipirinha', precio: 950 },
-  ],
-  Licuados: [
-    { nombre: 'Licuado de Frutilla', precio: 700 },
-    { nombre: 'Licuado de Banana', precio: 650 },
-    { nombre: 'Licuado de Durazno', precio: 700 },
-    { nombre: 'Smoothie Tropical', precio: 800 },
-  ],
-  Aguas: [
-    { nombre: 'Agua Mineral', precio: 300 },
-    { nombre: 'Agua Saborizada', precio: 350 },
-    { nombre: 'Agua con Gas', precio: 300 },
-  ],
-  Gaseosas: [
-    { nombre: 'Coca Cola', precio: 400 },
-    { nombre: 'Sprite', precio: 400 },
-    { nombre: 'Fanta', precio: 400 },
-  ],
-};
+import { useProductosPorArea } from '@/hooks/useProductosPorArea';
 
 export function BarraPiletaDashboardPage() {
-  return <AreaDashboard area="BARRA_PILETA" titulo="Barra Pileta" productosPorCategoria={productos} />;
+  const { productosPorCategoria, loading } = useProductosPorArea('BARRA_PILETA');
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">Cargando productos...</p>
+      </div>
+    );
+  }
+
+  return <AreaDashboard area="BARRA_PILETA" titulo="Barra Pileta" productosPorCategoria={productosPorCategoria} />;
 }

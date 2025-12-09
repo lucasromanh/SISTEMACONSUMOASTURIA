@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '@/types/auth';
+import { authService } from '@/services/auth.service';
 
 // Función helper para obtener la ruta por defecto según el rol
 export const getDefaultRouteForRole = (role: string): string => {
@@ -23,46 +24,22 @@ interface AuthStore {
 export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   isAuthenticated: false,
-  
+
   login: async (username: string, password: string) => {
-    // Mock users
-    const users: { username: string; password: string; user: User }[] = [
-      {
-        username: 'admin',
-        password: 'admin123',
-        user: { id: '1', username: 'admin', displayName: 'Administrador', role: 'ADMIN' },
-      },
-      {
-        username: 'winnebar',
-        password: 'winne123',
-        user: { id: '2', username: 'winnebar', displayName: 'Winne Bar', role: 'WINNE_BAR' },
-      },
-      {
-        username: 'pileta',
-        password: 'pileta123',
-        user: { id: '3', username: 'pileta', displayName: 'Barra Pileta', role: 'BARRA_PILETA' },
-      },
-      {
-        username: 'finca',
-        password: 'finca123',
-        user: { id: '4', username: 'finca', displayName: 'La Finca', role: 'FINCA' },
-      },
-      {
-        username: 'resto',
-        password: 'resto123',
-        user: { id: '5', username: 'resto', displayName: 'Restaurante', role: 'RESTAURANTE' },
-      },
-    ];
+    try {
+      const result = await authService.login(username, password);
 
-    const foundUser = users.find((u) => u.username === username && u.password === password);
+      if (result.success && result.user) {
+        set({ user: result.user, isAuthenticated: true });
+        localStorage.setItem('user', JSON.stringify(result.user));
+        return true;
+      }
 
-    if (foundUser) {
-      set({ user: foundUser.user, isAuthenticated: true });
-      localStorage.setItem('user', JSON.stringify(foundUser.user));
-      return true;
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-
-    return false;
   },
 
   logout: () => {
@@ -81,3 +58,4 @@ if (storedUser) {
     console.error('Error al cargar usuario desde localStorage', e);
   }
 }
+

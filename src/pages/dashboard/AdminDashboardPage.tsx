@@ -11,6 +11,7 @@ import { getDateRangeByPeriod } from '@/utils/dateHelpers';
 import { formatCurrency } from '@/utils/formatters';
 import { ConsumosTable } from '@/components/consumos/ConsumosTable';
 import { CajaDetalleTabla } from '@/components/cajas/CajaDetalleTabla';
+import { UserManagement } from '@/components/admin/UserManagement';
 import { DollarSign, TrendingUp, Wallet, BarChart, CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -298,11 +299,42 @@ export function AdminDashboardPage() {
           </div>
         </div>
 
-        <Tabs defaultValue="consumos" className="space-y-3 sm:space-y-4 w-full">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="consumos" className="text-xs sm:text-sm">Todos los Consumos</TabsTrigger>
-            <TabsTrigger value="movimientos" className="text-xs sm:text-sm">Movimientos de Caja</TabsTrigger>
+        <Tabs defaultValue="resumen" className="space-y-3 sm:space-y-4 w-full">
+          <TabsList className="w-full grid grid-cols-3">
+            <TabsTrigger value="resumen" className="text-xs sm:text-sm">Resumen</TabsTrigger>
+            <TabsTrigger value="consumos" className="text-xs sm:text-sm">Consumos</TabsTrigger>
+            <TabsTrigger value="usuarios" className="text-xs sm:text-sm">Usuarios</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="resumen" className="space-y-4">
+            <Tabs defaultValue="consumos" className="space-y-3 sm:space-y-4 w-full">
+              <TabsList className="w-full grid grid-cols-2">
+                <TabsTrigger value="consumos" className="text-xs sm:text-sm">Todos los Consumos</TabsTrigger>
+                <TabsTrigger value="movimientos" className="text-xs sm:text-sm">Movimientos de Caja</TabsTrigger>
+              </TabsList>
+              <TabsContent value="consumos">
+                <Card className="w-full">
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Consumos de Todas las Áreas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <ConsumosTable consumos={consumos} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              <TabsContent value="movimientos">
+                <Card className="w-full">
+                  <CardHeader>
+                    <CardTitle className="text-base sm:text-lg">Movimientos de Caja de Todas las Áreas</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <CajaDetalleTabla movimientos={movimientos} />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
           <TabsContent value="consumos">
             <Card className="w-full">
               <CardHeader>
@@ -313,15 +345,9 @@ export function AdminDashboardPage() {
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="movimientos">
-            <Card className="w-full">
-              <CardHeader>
-                <CardTitle className="text-base sm:text-lg">Movimientos de Caja de Todas las Áreas</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <CajaDetalleTabla movimientos={movimientos} />
-              </CardContent>
-            </Card>
+
+          <TabsContent value="usuarios">
+            <UserManagement />
           </TabsContent>
         </Tabs>
       </div>
