@@ -48,7 +48,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     loadMovimientos(area, fechaISO, fechaISO);
   }, [fechaISO, area, loadConsumos, loadMovimientos]);
 
-  // Filtrar consumos del dÃ­a seleccionado
+  // Filtrar consumos del día seleccionado
   const consumos = useMemo(() => {
     return allConsumos.filter((c) => {
       const consumoDate = c.fecha.split(' ')[0];
@@ -56,7 +56,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     });
   }, [fechaISO, area, allConsumos]);
 
-  // Filtrar movimientos del dÃ­a seleccionado
+  // Filtrar movimientos del día seleccionado
   const movimientos = useMemo(() => {
     return allMovimientos.filter((m: MovimientoCaja) => {
       const movDate = m.fecha.split(' ')[0];
@@ -64,12 +64,12 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     });
   }, [fechaISO, area, allMovimientos]);
 
-  // Filtrar gastos del dÃ­a seleccionado
+  // Filtrar gastos del día seleccionado
   const gastos = useMemo(() => {
     return getGastosByDateRange(fechaISO, fechaISO, area);
   }, [fechaISO, area, getGastosByDateRange]);
 
-  // Crear lista de transacciones del dÃ­a ordenadas
+  // Crear lista de transacciones del día ordenadas
   const transaccionesDia = useMemo(() => {
     const transacciones: Array<{
       tipo: 'INGRESO_INICIAL' | 'CONSUMO' | 'GASTO';
@@ -160,7 +160,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     return transacciones;
   }, [consumos, movimientos, gastos]);
 
-  // Calcular totales del dÃ­a
+  // Calcular totales del día
   const totalesDia = useMemo(() => {
     // Usar movimientos como fuente de verdad para totales financieros
     const ingresoInicial = movimientos
@@ -175,7 +175,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + m.monto, 0);
 
-    // Consumos cargados a habitaciÃ³n (source: consumos o movimientos si no hay consumos)
+    // Consumos cargados a Habitación (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
       .reduce((sum, c) => sum + c.total, 0);
@@ -211,14 +211,14 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       `consumos-${area.toLowerCase()}-${fechaISO}`,
       [
         { key: 'fecha', label: 'Fecha' },
-        { key: 'habitacionOCliente', label: 'HabitaciÃ³n/Cliente' },
+        { key: 'habitacionOCliente', label: 'Habitación/Cliente' },
         { key: 'consumoDescripcion', label: 'Consumo' },
-        { key: 'categoria', label: 'CategorÃ­a' },
+        { key: 'categoria', label: 'Categoría' },
         { key: 'cantidad', label: 'Cantidad' },
         { key: 'precioUnitario', label: 'Precio Unitario' },
         { key: 'total', label: 'Total' },
         { key: 'estado', label: 'Estado' },
-        { key: 'metodoPago', label: 'MÃ©todo de Pago' },
+        { key: 'metodoPago', label: 'Método de Pago' },
       ]
     );
   };
@@ -230,7 +230,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-hotel-wine-900 dark:text-hotel-wine-400">{titulo}</h1>
-            <p className="text-sm sm:text-base text-muted-foreground">GestiÃ³n de consumos por dÃ­a</p>
+            <p className="text-sm sm:text-base text-muted-foreground">Gestión de consumos por día</p>
           </div>
           <div className="w-full sm:w-auto">
             <DatePicker
@@ -244,13 +244,13 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
         {/* Formulario de registro */}
         <ConsumoForm area={area} productosPorCategoria={productosPorCategoria} />
 
-        {/* Resumen del dÃ­a */}
+        {/* Resumen del día */}
         <Card className="bg-gradient-to-br from-hotel-wine-50 to-hotel-wine-100 dark:from-zinc-900 dark:to-zinc-800 border-2 border-hotel-wine-200 dark:border-zinc-700 w-full">
           <CardHeader>
             <CardTitle className="text-base sm:text-xl flex items-center gap-2">
               <DollarSign className="h-5 w-5 sm:h-6 sm:w-6" />
               <span className="line-clamp-2 sm:line-clamp-1">
-                Resumen del DÃ­a - {format(fechaSeleccionada, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                Resumen del día - {format(fechaSeleccionada, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
               </span>
             </CardTitle>
           </CardHeader>
@@ -286,7 +286,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
             {totalesDia.consumosCargados > 0 && (
               <div className="pt-2">
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Cargado a HabitaciÃ³n (no incluido en caja)</p>
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Cargado a Habitación (no incluido en caja)</p>
                 <p className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosCargados)}</p>
               </div>
             )}
@@ -296,13 +296,13 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
         {/* Detalle de transacciones */}
         <Card className="w-full">
           <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <CardTitle className="text-base sm:text-lg">Detalle de Transacciones del DÃ­a</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Detalle de Transacciones del día</CardTitle>
             <ExportButtons onExportCSV={handleExportCSV} disabled={transaccionesDia.length === 0} />
           </CardHeader>
           <CardContent className="p-3 sm:p-6">
             {transaccionesDia.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm sm:text-base">No hay transacciones registradas para este dÃ­a</p>
+                <p className="text-sm sm:text-base">No hay transacciones registradas para este día</p>
               </div>
             ) : (
               <div className="space-y-2 sm:space-y-3 w-full">
@@ -322,9 +322,9 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                         <p className="font-medium text-sm sm:text-base break-words">{transaccion.descripcion}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <p className="text-xs sm:text-sm text-muted-foreground">
-                            {transaccion.metodoPago === 'EFECTIVO' && 'ðŸ’µ Efectivo'}
-                            {transaccion.metodoPago === 'TRANSFERENCIA' && 'ðŸ¦ Transferencia'}
-                            {transaccion.metodoPago === 'CARGAR_HABITACION' && 'ðŸ¨ Cargado a HabitaciÃ³n'}
+                            {transaccion.metodoPago === 'EFECTIVO' && '💵 Efectivo'}
+                            {transaccion.metodoPago === 'TRANSFERENCIA' && '🏦 Transferencia'}
+                            {transaccion.metodoPago === 'CARGAR_HABITACION' && '🏨 Cargado a Habitación'}
                           </p>
                           {transaccion.metodoPago === 'TRANSFERENCIA' && (transaccion as any).datosTransferencia?.imagenComprobante && (
                             <button

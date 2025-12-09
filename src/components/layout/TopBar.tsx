@@ -53,7 +53,7 @@ export function TopBar({ sidebarOpen, setSidebarOpen }: TopBarProps) {
           {/* Desktop: Show full user info */}
           <div className="hidden md:flex items-center gap-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">{user.displayName}</span>
+            <span className="text-sm font-medium">{user.username}</span>
             <RoleBadge role={user.role} />
           </div>
 
@@ -81,7 +81,7 @@ export function TopBar({ sidebarOpen, setSidebarOpen }: TopBarProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>
                 <div className="flex flex-col gap-1">
-                  <span className="font-medium">{user.displayName}</span>
+                  <span className="font-medium">{user.username}</span>
                   <RoleBadge role={user.role} />
                 </div>
               </DropdownMenuLabel>
