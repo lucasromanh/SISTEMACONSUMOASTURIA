@@ -8,7 +8,7 @@ export interface CreateGastoRequest {
     area: string;
     descripcion: string;
     monto: number;
-    relacionado_stock_item_id?: number;
+    relacionado_stock_item_id?: number | null; // ✅ Permitir null además de undefined
 }
 
 export interface CreateGastoResponse {

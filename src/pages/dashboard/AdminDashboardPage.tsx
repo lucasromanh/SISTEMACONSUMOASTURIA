@@ -113,8 +113,15 @@ export function AdminDashboardPage() {
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 
+    console.log('📊 Dashboard Global - Movimientos totales:', movimientos.length);
+    console.log('📊 Dashboard Global - Ingresos:', ingresos.length, ingresos);
+    console.log('📊 Dashboard Global - Egresos:', egresos.length, egresos);
+
     const totalIngresos = ingresos.reduce((sum, m) => sum + m.monto, 0);
     const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
+
+    console.log('📊 Dashboard Global - Total Ingresos:', totalIngresos);
+    console.log('📊 Dashboard Global - Total Egresos:', totalEgresos);
 
     return {
       total,

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +16,7 @@ import type { AreaConsumo } from '@/types/consumos';
 
 export function GastosPage() {
   const [periodo, setPeriodo] = useState<'day' | 'week' | 'month'>('day');
-  const { getGastosByDateRange, gastos: allGastos } = useStockStore();
+  const { getGastosByDateRange, gastos: allGastos, loadGastos } = useStockStore();
   const { user } = useAuthStore();
 
   const area: AreaConsumo | 'GENERAL' | undefined = useMemo(() => {
@@ -27,6 +27,12 @@ export function GastosPage() {
     if (user.role === 'RESTAURANTE') return 'RESTAURANTE';
     return undefined;
   }, [user]);
+
+  // ✅ Cargar gastos al montar el componente y cuando cambia el área o período
+  useEffect(() => {
+    const { start, end } = getDateRangeByPeriod(periodo);
+    loadGastos(area, start, end);
+  }, [area, periodo, loadGastos]);
 
   const gastos = useMemo(() => {
     const { start, end } = getDateRangeByPeriod(periodo);
@@ -125,10 +131,10 @@ export function GastosPage() {
                       <TableCell>
                         <Badge variant="outline" className={
                           gasto.area === 'WINNE_BAR' ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800' :
-                          gasto.area === 'BARRA_PILETA' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
-                          gasto.area === 'FINCA' ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
-                          gasto.area === 'RESTAURANTE' ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
-                          'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
+                            gasto.area === 'BARRA_PILETA' ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' :
+                              gasto.area === 'FINCA' ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' :
+                                gasto.area === 'RESTAURANTE' ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800' :
+                                  'bg-slate-100 text-slate-800 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700'
                         }>
                           {gasto.area.replace('_', ' ')}
                         </Badge>

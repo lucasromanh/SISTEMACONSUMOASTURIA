@@ -100,7 +100,7 @@ export const useStockStore = create<StockStore>((set, get) => ({
         monto: gastoData.monto,
         relacionado_stock_item_id: gastoData.relacionadoAStockItemId
           ? parseInt(gastoData.relacionadoAStockItemId)
-          : undefined,
+          : null, // ✅ Cambiar undefined a null para que PHP lo maneje correctamente
       });
 
       if (response.success) {
@@ -124,8 +124,16 @@ export const useStockStore = create<StockStore>((set, get) => ({
             origen: 'GASTO',
             descripcion: newGasto.descripcion,
             monto: newGasto.monto,
+            metodoPago: 'EFECTIVO', // ✅ Los gastos siempre se pagan en efectivo de la caja
           });
         }
+
+        // ✅ Recargar gastos desde el backend para asegurar sincronización
+        await get().loadGastos(gastoData.area);
+
+        // ✅ Recargar movimientos para que los egresos aparezcan en el dashboard
+        const { loadMovimientos } = useCajasStore.getState();
+        await loadMovimientos(gastoData.area as AreaConsumo);
 
         return true;
       }
@@ -201,7 +209,7 @@ export const useStockStore = create<StockStore>((set, get) => ({
           fecha: g.fecha,
           area: g.area as any,
           descripcion: g.descripcion,
-          monto: g.monto,
+          monto: typeof g.monto === 'string' ? parseFloat(g.monto) : g.monto, // ✅ Convertir a número
           relacionadoAStockItemId: g.relacionado_stock_item_id?.toString(),
         }));
 

@@ -249,7 +249,9 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
       };
 
       const { movimientosService } = await import('@/services/movimientos.service');
+      console.log('💰 Creando movimiento:', backendData);
       const response = await movimientosService.createMovimiento(backendData);
+      console.log('💰 Respuesta del backend:', response);
 
       if (response.success) {
         // Crear movimiento local con ID del backend
@@ -262,12 +264,14 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
           movimientos: [...state.movimientos, newMovimiento],
         }));
 
+        console.log('✅ Movimiento creado exitosamente:', newMovimiento);
         return true;
       }
 
+      console.error('❌ Error al crear movimiento - response.success es false');
       return false;
     } catch (error) {
-      console.error('Error al crear movimiento:', error);
+      console.error('❌ Error al crear movimiento:', error);
       return false;
     }
   },
