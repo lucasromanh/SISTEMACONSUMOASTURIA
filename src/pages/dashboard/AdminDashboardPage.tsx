@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +23,8 @@ export function AdminDashboardPage() {
   const [periodo, setPeriodo] = useState<PeriodoPreset>('day');
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>();
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>();
-  const { getConsumosByDateRange, consumos: allConsumos } = useConsumosStore();
-  const { getMovimientosByDateRange, movimientos: allMovimientos } = useCajasStore();
+  const { getConsumosByDateRange, consumos: allConsumos, loadConsumos } = useConsumosStore();
+  const { getMovimientosByDateRange, movimientos: allMovimientos, loadMovimientos } = useCajasStore();
 
   const dateRange = useMemo(() => {
     if (periodo === 'custom' && customStartDate && customEndDate) {
@@ -63,8 +63,19 @@ export function AdminDashboardPage() {
     return getDateRangeByPeriod(periodo as 'day' | 'week' | 'month');
   }, [periodo, customStartDate, customEndDate]);
 
+  // Cargar datos del backend cuando cambia el rango de fechas
+  useEffect(() => {
+    // Cargar consumos de todas las áreas para el rango de fechas
+    loadConsumos(undefined, dateRange.start, dateRange.end);
+    // Cargar movimientos de todas las áreas para el rango de fechas
+    loadMovimientos(undefined, dateRange.start, dateRange.end);
+  }, [dateRange.start, dateRange.end, loadConsumos, loadMovimientos]);
+
   const consumos = useMemo(() => {
-    return getConsumosByDateRange(dateRange.start, dateRange.end);
+    const result = getConsumosByDateRange(dateRange.start, dateRange.end);
+    console.log('📊 Dashboard - Consumos cargados:', result.length, result);
+    console.log('📊 Dashboard - Áreas únicas:', [...new Set(result.map(c => c.area))]);
+    return result;
   }, [dateRange, getConsumosByDateRange, allConsumos]);
 
   const movimientos = useMemo(() => {

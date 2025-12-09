@@ -42,6 +42,7 @@ export interface ConsumoBackend {
     total: number;
     estado: string;
     monto_pagado: number | null;
+    metodo_pago: string | null; // ✅ Agregado
     usuario_registro_id: number;
     ticket_id: number | null;
     usuario_registro: string;

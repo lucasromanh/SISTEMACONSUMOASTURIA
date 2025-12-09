@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ComprobanteTransferenciaModal } from '@/components/cajas/ComprobanteTransferenciaModal';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle2 } from 'lucide-react';
+import { ticketsService } from '@/services/tickets.service';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +45,7 @@ interface ProductoAgregado {
 import type { PagoRegistrado } from '@/types/consumos';
 interface PedidoActivo {
   id: string;
+  ticketId?: number; // ID real del ticket en la BD
   nombre: string; // Nombre temporal del pedido
   productos: ProductoAgregado[];
   fechaInicio: string;
@@ -132,21 +134,56 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   };
 
   // Crear nuevo ticket de consumo
-  const handleCrearPedidoVacio = () => {
-    const nuevoPedido: PedidoActivo = {
-      id: `pedido-${Date.now()}`,
-      nombre: `Ticket #${contadorPedidos}`,
-      productos: [],
-      fechaInicio: new Date().toISOString(),
-    };
+  const handleCrearPedidoVacio = async () => {
+    if (!user) return;
 
-    setPedidosActivos([...pedidosActivos, nuevoPedido]);
-    setPedidoSeleccionado(nuevoPedido.id);
-    setContadorPedidos(contadorPedidos + 1);
+    try {
+      // Crear ticket en el backend
+      const response = await ticketsService.createTicket({
+        user_id: user.id,
+        area: area,
+        fecha_apertura: new Date().toISOString(),
+        turno: user.username,
+        notas: '',
+      });
+
+      if (!response.success) {
+        toast({
+          variant: "destructive",
+          title: "❌ Error al crear ticket",
+          description: response.message || 'No se pudo crear el ticket',
+        });
+        return;
+      }
+
+      const nuevoPedido: PedidoActivo = {
+        id: `pedido-${Date.now()}`,
+        ticketId: response.ticket_id, // ID real de la BD
+        nombre: `Ticket #${contadorPedidos}`,
+        productos: [],
+        fechaInicio: new Date().toISOString(),
+      };
+
+      setPedidosActivos([...pedidosActivos, nuevoPedido]);
+      setPedidoSeleccionado(nuevoPedido.id);
+      setContadorPedidos(contadorPedidos + 1);
+
+      toast({
+        title: "✅ Ticket creado",
+        description: `Ticket #${response.ticket_id} creado exitosamente`,
+      });
+    } catch (error) {
+      console.error('Error al crear ticket:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Error",
+        description: 'Error al crear el ticket',
+      });
+    }
   };
 
   // Agregar producto al pedido seleccionado
-  const handleAgregarProducto = () => {
+  const handleAgregarProducto = async () => {
     if (!pedidoSeleccionado) {
       toast({
         variant: "destructive",
@@ -160,31 +197,62 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       return;
     }
 
+    const pedidoActual = pedidosActivos.find(p => p.id === pedidoSeleccionado);
+    if (!pedidoActual || !pedidoActual.ticketId || !user) return;
+
     const cantidadNum = parseFloat(cantidad);
     const precioNum = parseFloat(precioUnitario);
     const subtotal = cantidadNum * precioNum;
 
-    const nuevoProducto: ProductoAgregado = {
-      id: `${Date.now()}-${Math.random()}`,
-      categoria,
-      nombre: productoSeleccionado,
-      precioUnitario: precioNum,
-      cantidad: cantidadNum,
-      subtotal,
-    };
+    try {
+      // Agregar item al ticket en el backend
+      const response = await ticketsService.addTicketItem({
+        user_id: user.id,
+        ticket_id: pedidoActual.ticketId,
+        tipo_item: 'CONSUMO',
+        descripcion: `${productoSeleccionado} x${cantidadNum}`,
+        monto: subtotal,
+        metodo_pago: 'PENDIENTE',
+      });
 
-    // Agregar al pedido seleccionado
-    setPedidosActivos(pedidosActivos.map(pedido =>
-      pedido.id === pedidoSeleccionado
-        ? { ...pedido, productos: [...pedido.productos, nuevoProducto] }
-        : pedido
-    ));
+      if (!response.success) {
+        toast({
+          variant: "destructive",
+          title: "❌ Error",
+          description: response.message || 'No se pudo agregar el producto',
+        });
+        return;
+      }
 
-    // Limpiar campos de producto
-    setCategoria('');
-    setProductoSeleccionado('');
-    setPrecioUnitario('');
-    setCantidad('1');
+      const nuevoProducto: ProductoAgregado = {
+        id: `${Date.now()}-${Math.random()}`,
+        categoria,
+        nombre: productoSeleccionado,
+        precioUnitario: precioNum,
+        cantidad: cantidadNum,
+        subtotal,
+      };
+
+      // Agregar al pedido seleccionado
+      setPedidosActivos(pedidosActivos.map(pedido =>
+        pedido.id === pedidoSeleccionado
+          ? { ...pedido, productos: [...pedido.productos, nuevoProducto] }
+          : pedido
+      ));
+
+      // Limpiar campos de producto
+      setCategoria('');
+      setProductoSeleccionado('');
+      setPrecioUnitario('');
+      setCantidad('1');
+    } catch (error) {
+      console.error('Error al agregar producto:', error);
+      toast({
+        variant: "destructive",
+        title: "❌ Error",
+        description: 'Error al agregar el producto al ticket',
+      });
+    }
   };
 
   const handleEliminarProducto = (productoId: string) => {
@@ -312,6 +380,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
           metodoPago: estadoAUsar === 'PAGADO' ? metodoPago : undefined,
           usuarioRegistroId: user?.id || '',
+          ticketId: pedido.ticketId, // Vincular consumo con ticket
           pagos: pagos,
         };
         // Si hubo pagos parciales con transferencia, pasar los comprobantes
@@ -325,9 +394,29 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       });
     };
 
+    // Cerrar ticket en el backend
+    const cerrarTicket = async () => {
+      if (!pedido.ticketId || !user) return;
+
+      try {
+        await ticketsService.closeTicket({
+          user_id: user.id,
+          ticket_id: pedido.ticketId,
+          fecha_cierre: new Date().toISOString(),
+          total_efectivo: metodoPago === 'EFECTIVO' ? totalPedido : 0,
+          total_transferencia: metodoPago === 'TRANSFERENCIA' ? totalPedido : 0,
+          total_habitacion: estadoFinal === 'CARGAR_HABITACION' ? totalPedido : 0,
+          notas_cierre: `Hab/Cliente: ${habitacionOCliente}`,
+        });
+      } catch (error) {
+        console.error('Error al cerrar ticket:', error);
+      }
+    };
+
     // Registrar consumos si está PAGADO o si se debe cargar a habitación
     if (estadoFinal === 'PAGADO') {
       registrarConsumos('PAGADO');
+      cerrarTicket(); // Cerrar ticket en BD
       // Remover pedido y cerrar modal
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
@@ -342,6 +431,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     } else if (estadoFinal === 'CARGAR_HABITACION') {
       // Registrar consumos con estado cargado a habitación
       registrarConsumos('CARGAR_HABITACION');
+      cerrarTicket(); // Cerrar ticket en BD
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
         setPedidoSeleccionado(null);
@@ -477,8 +567,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                     <div
                       key={pedido.id}
                       className={`border-2 rounded-lg p-3 cursor-pointer transition-all ${esActivo
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
-                          : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30'
+                        : 'border-gray-300 dark:border-gray-700 hover:border-blue-400'
                         }`}
                       onClick={() => setPedidoSeleccionado(pedido.id)}
                     >

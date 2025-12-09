@@ -39,6 +39,9 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         precio_unitario: consumoData.precioUnitario,
         cantidad: consumoData.cantidad,
         estado: consumoData.estado,
+        ticket_id: consumoData.ticketId, // Vincular con ticket
+        metodo_pago: consumoData.metodoPago || null, // ✅ Agregar método de pago
+        monto_pagado: consumoData.montoPagado || null, // ✅ Agregar monto pagado
       };
 
       const response = await consumosService.createConsumo(backendData);
@@ -55,6 +58,29 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           consumos: [...state.consumos, newConsumo],
           loading: false,
         }));
+
+        // Si está pagado, crear el pago en wb_consumo_pagos
+        if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado && newConsumo.metodoPago) {
+          try {
+            const pagoData = {
+              user_id: user.id,
+              consumo_id: response.id,
+              fecha: newConsumo.fecha.split('T')[0], // Solo la fecha YYYY-MM-DD
+              metodo: newConsumo.metodoPago as 'EFECTIVO' | 'TRANSFERENCIA' | 'CARGAR_HABITACION',
+              monto: newConsumo.montoPagado,
+              // Datos de transferencia si existen
+              hora: consumoData.datosTransferencia?.hora,
+              alias_cbu: consumoData.datosTransferencia?.aliasCbu,
+              banco: consumoData.datosTransferencia?.banco,
+              numero_operacion: consumoData.datosTransferencia?.numeroOperacion,
+              imagen_comprobante: consumoData.datosTransferencia?.imagenComprobante,
+            };
+
+            await consumosService.createPago(pagoData);
+          } catch (pagoError) {
+            console.error('Error al crear pago:', pagoError);
+          }
+        }
 
         // Agregar movimiento de caja para todos los consumos (mantener lógica existente)
         const { addMovimiento } = useCajasStore.getState();
@@ -141,12 +167,16 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
     set({ loading: true });
 
     try {
+      console.log('🔍 loadConsumos - Params:', { user_id: user.id, area, from, to });
+
       const response = await consumosService.listConsumos({
         user_id: user.id,
         area,
         from,
         to,
       });
+
+      console.log('🔍 loadConsumos - Response:', response);
 
       if (response.success) {
         // Transformar consumos del backend al formato frontend
@@ -157,14 +187,17 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           habitacionOCliente: c.habitacion_cliente,
           consumoDescripcion: c.consumo_descripcion,
           categoria: c.categoria,
-          precioUnitario: c.precio_unitario,
-          cantidad: c.cantidad,
-          total: c.total,
+          precioUnitario: parseFloat(c.precio_unitario as any) || 0, // ✅ Parse float
+          cantidad: parseFloat(c.cantidad as any) || 0, // ✅ Parse float
+          total: parseFloat(c.total as any) || 0, // ✅ Parse float
           estado: c.estado as any,
-          montoPagado: c.monto_pagado,
-          metodoPago: null, // Deprecated
+          montoPagado: c.monto_pagado ? parseFloat(c.monto_pagado as any) : null, // ✅ Parse float
+          metodoPago: c.metodo_pago as any, // ✅ Usar el valor del backend
           usuarioRegistroId: c.usuario_registro_id.toString(),
+          ticketId: c.ticket_id ?? undefined, // ✅ Convertir null a undefined
         }));
+
+        console.log('🔍 loadConsumos - Consumos transformados:', consumos.length, consumos);
 
         set({ consumos, loading: false });
       } else {
@@ -261,7 +294,7 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
           tipo: m.tipo,
           origen: m.origen,
           descripcion: m.descripcion,
-          monto: m.monto,
+          monto: parseFloat(m.monto) || 0, // ✅ Asegurar que sea número
           metodoPago: m.metodo_pago as any,
           datosTransferencia: m.datos_transferencia,
           sincronizado: m.sincronizado,

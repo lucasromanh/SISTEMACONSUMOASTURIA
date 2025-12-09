@@ -70,26 +70,24 @@ export function isBetweenDates(date: string, startDate: string, endDate: string)
  * Obtiene el rango de fechas según el período
  */
 export function getDateRangeByPeriod(period: 'day' | 'week' | 'month'): { start: string; end: string } {
-  const today = new Date();
-  let start: Date;
-  let end: Date = today;
+  let start: string;
+  let end: string;
 
   switch (period) {
     case 'day':
-      start = today;
+      // Usar getTodayISO() que maneja correctamente la zona horaria local
+      start = getTodayISO();
+      end = getTodayISO();
       break;
     case 'week':
-      start = getStartOfWeek();
-      end = getEndOfWeek();
+      start = toISODate(getStartOfWeek());
+      end = toISODate(getEndOfWeek());
       break;
     case 'month':
-      start = getStartOfMonth();
-      end = getEndOfMonth();
+      start = toISODate(getStartOfMonth());
+      end = toISODate(getEndOfMonth());
       break;
   }
 
-  return {
-    start: toISODate(start),
-    end: toISODate(end),
-  };
+  return { start, end };
 }

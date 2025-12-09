@@ -1,4 +1,4 @@
-﻿import { useState, useMemo } from 'react';
+﻿import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
@@ -35,6 +35,17 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
   const fechaISO = useMemo(() => {
     return format(fechaSeleccionada, 'yyyy-MM-dd');
   }, [fechaSeleccionada]);
+
+  // Cargar datos del backend cuando cambia la fecha o al montar el componente
+  const { loadConsumos } = useConsumosStore();
+  const { loadMovimientos } = useCajasStore();
+
+  useEffect(() => {
+    // Cargar consumos del área y fecha seleccionada
+    loadConsumos(area, fechaISO, fechaISO);
+    // Cargar movimientos de caja del área y fecha seleccionada
+    loadMovimientos(area, fechaISO, fechaISO);
+  }, [fechaISO, area, loadConsumos, loadMovimientos]);
 
   // Filtrar consumos del dÃ­a seleccionado
   const consumos = useMemo(() => {
@@ -345,7 +356,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
           <DialogHeader className="p-6 pb-4">
             <div className="flex items-center justify-between">
               <DialogTitle className="text-lg font-semibold">
-                 Comprobante de Transferencia
+                Comprobante de Transferencia
               </DialogTitle>
               <Button
                 variant="ghost"

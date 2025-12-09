@@ -33,10 +33,11 @@ export interface Consumo {
   montoPagado: number | null;
   metodoPago: MetodoPago; // Método principal (deprecated, usar pagos[])
   usuarioRegistroId: string; // user id
-  
+  ticketId?: number; // ID del ticket asociado
+
   // Sistema de pagos múltiples
   pagos?: PagoRegistrado[];
-  
+
   // Datos de transferencia (deprecated, usar pagos[])
   datosTransferencia?: {
     hora?: string;
