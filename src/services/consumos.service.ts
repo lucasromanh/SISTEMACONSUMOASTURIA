@@ -13,6 +13,8 @@ export interface CreateConsumoRequest {
     cantidad: number;
     estado: 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL';
     ticket_id?: number;
+    metodo_pago?: string | null; // ✅ Método de pago
+    monto_pagado?: number | null; // ✅ Monto pagado
 }
 
 export interface CreateConsumoResponse {

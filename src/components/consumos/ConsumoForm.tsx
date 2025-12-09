@@ -280,7 +280,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     setMostrarModalCierre(true);
     setHabitacionOCliente('');
     setEstado('CARGAR_HABITACION');
-    setMetodoPago(null);
+    setMetodoPago('EFECTIVO'); // ✅ Inicializar con valor válido
   };
 
 
@@ -309,7 +309,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         fecha: fechaActual,
         metodo: 'TRANSFERENCIA',
         monto: montoTransferencia,
-        usuarioRegistroId: user?.id || '',
+        usuarioRegistroId: user?.id ? String(user.id) : '',
         datosTransferencia: {
           hora: datosTransferencia.hora,
           aliasCbu: datosTransferencia.aliasCbu,
@@ -379,7 +379,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           estado: estadoAUsar,
           montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
           metodoPago: estadoAUsar === 'PAGADO' ? metodoPago : undefined,
-          usuarioRegistroId: user?.id || '',
+          usuarioRegistroId: user?.id ? String(user.id) : '',
           ticketId: pedido.ticketId, // Vincular consumo con ticket
           pagos: pagos,
         };

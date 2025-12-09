@@ -153,7 +153,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
 
   getConsumosByDateRange: (startDate, endDate, area) => {
     return get().consumos.filter((c) => {
-      const consumoDate = c.fecha;
+      // Extraer solo la parte de fecha (YYYY-MM-DD) del timestamp
+      const consumoDate = c.fecha.split(' ')[0]; // "2025-12-09 00:00:00" -> "2025-12-09"
       const matchesDate = consumoDate >= startDate && consumoDate <= endDate;
       const matchesArea = area ? c.area === area : true;
       return matchesDate && matchesArea;
@@ -317,7 +318,8 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
 
   getMovimientosByDateRange: (startDate, endDate, area) => {
     return get().movimientos.filter((m) => {
-      const movDate = m.fecha;
+      // Extraer solo la parte de fecha (YYYY-MM-DD) del timestamp
+      const movDate = m.fecha.split(' ')[0];
       const matchesDate = movDate >= startDate && movDate <= endDate;
       const matchesArea = area ? m.area === area : true;
       return matchesDate && matchesArea;

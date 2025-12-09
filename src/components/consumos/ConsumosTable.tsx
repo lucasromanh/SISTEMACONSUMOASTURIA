@@ -38,7 +38,7 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
       estado: 'PAGADO',
       montoPagado: consumoAPagar.total,
       metodoPago,
-      usuarioRegistroId: user.id,
+      usuarioRegistroId: user.id.toString(),
     });
 
     toast({
