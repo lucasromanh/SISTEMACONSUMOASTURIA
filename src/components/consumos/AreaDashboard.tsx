@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
+import { ConsumosTable } from '@/components/consumos/ConsumosTable';
 import { ExportButtons } from '@/components/common/ExportButtons';
 import { useConsumosStore, useCajasStore } from '@/store/consumosStore';
 import { useStockStore } from '@/store/stockStore';
@@ -49,12 +50,18 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
   // Filtrar consumos del dÃ­a seleccionado
   const consumos = useMemo(() => {
-    return allConsumos.filter((c) => c.fecha === fechaISO && c.area === area);
+    return allConsumos.filter((c) => {
+      const consumoDate = c.fecha.split(' ')[0];
+      return consumoDate === fechaISO && c.area === area;
+    });
   }, [fechaISO, area, allConsumos]);
 
   // Filtrar movimientos del dÃ­a seleccionado
   const movimientos = useMemo(() => {
-    return allMovimientos.filter((m: MovimientoCaja) => m.fecha === fechaISO && m.area === area);
+    return allMovimientos.filter((m: MovimientoCaja) => {
+      const movDate = m.fecha.split(' ')[0];
+      return movDate === fechaISO && m.area === area;
+    });
   }, [fechaISO, area, allMovimientos]);
 
   // Filtrar gastos del dÃ­a seleccionado
@@ -348,7 +355,18 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
               </div>
             )}
           </CardContent>
-        </Card>      </div>
+        </Card>
+
+        {/* Tabla de Consumos con Tickets */}
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle className="text-base sm:text-lg">Consumos del Día</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ConsumosTable consumos={consumos} />
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Modal de Comprobante */}
       <Dialog open={comprobanteModalOpen} onOpenChange={setComprobanteModalOpen}>

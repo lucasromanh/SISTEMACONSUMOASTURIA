@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
 import type { MetodoPago } from '@/types/consumos';
+import { TicketReceiptModal } from '@/components/tickets/TicketReceiptModal';
+import { Receipt } from 'lucide-react';
 
 interface ConsumosTableProps {
   consumos: Consumo[];
@@ -24,6 +26,8 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
   const [pagoModalOpen, setPagoModalOpen] = useState(false);
   const [consumoAPagar, setConsumoAPagar] = useState<Consumo | null>(null);
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
 
   const handlePagarConsumo = (consumo: Consumo) => {
     setConsumoAPagar(consumo);
@@ -96,16 +100,31 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="w-[120px] px-2">
-                    {consumo.estado === 'CARGAR_HABITACION' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handlePagarConsumo(consumo)}
-                        className="bg-green-600 hover:bg-green-700 text-white text-[10px] px-2 h-7 whitespace-nowrap"
-                      >
-                        💰 Pagar
-                      </Button>
-                    )}
+                  <TableCell className="w-[140px] px-2">
+                    <div className="flex gap-1">
+                      {consumo.estado === 'CARGAR_HABITACION' && (
+                        <Button
+                          size="sm"
+                          onClick={() => handlePagarConsumo(consumo)}
+                          className="bg-green-600 hover:bg-green-700 text-white text-[10px] px-2 h-7 whitespace-nowrap"
+                        >
+                          💰 Pagar
+                        </Button>
+                      )}
+                      {consumo.ticketId && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedTicketId(consumo.ticketId!);
+                            setTicketModalOpen(true);
+                          }}
+                          className="text-[10px] px-2 h-7 whitespace-nowrap"
+                        >
+                          <Receipt className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -157,6 +176,24 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                     <p className="font-medium">{formatCurrency(consumo.precioUnitario)}</p>
                   </div>
                 </div>
+
+                {/* Botón Ver Ticket - Solo si tiene ticketId */}
+                {consumo.ticketId && (
+                  <div className="pt-2 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedTicketId(consumo.ticketId!);
+                        setTicketModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2"
+                    >
+                      <Receipt className="h-4 w-4" />
+                      Ver Ticket de Facturación
+                    </Button>
+                  </div>
+                )}
 
                 <div className="pt-2 border-t flex justify-between items-center">
                   <div>
@@ -222,6 +259,13 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Ticket */}
+      <TicketReceiptModal
+        open={ticketModalOpen}
+        onOpenChange={setTicketModalOpen}
+        ticketId={selectedTicketId}
+      />
     </>
   );
 }

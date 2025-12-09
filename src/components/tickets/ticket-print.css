@@ -1,0 +1,61 @@
+/* Estilos globales para impresión de tickets */
+@media print {
+  /* Ocultar elementos no necesarios */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Mostrar solo el ticket */
+  .ticket-receipt,
+  .ticket-receipt * {
+    visibility: visible;
+  }
+  
+  .ticket-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 80mm;
+    margin: 0;
+    padding: 10mm;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Ocultar botones de acción */
+  .print\\:hidden {
+    display: none !important;
+  }
+  
+  /* Optimizar tamaños de fuente para impresión */
+  .ticket-receipt {
+    font-size: 10pt;
+    line-height: 1.4;
+  }
+  
+  /* Asegurar que las imágenes se impriman */
+  .ticket-receipt img {
+    max-width: 100%;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  
+  /* Evitar saltos de página dentro del ticket */
+  .ticket-receipt {
+    page-break-inside: avoid;
+  }
+  
+  /* Forzar colores en impresión */
+  .ticket-receipt * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
+
+/* Estilos para vista en pantalla */
+@media screen {
+  .ticket-receipt {
+    font-family: 'Courier New', Courier, monospace;
+  }
+}
