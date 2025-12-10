@@ -196,6 +196,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           metodoPago: c.metodo_pago as any, // ✅ Usar el valor del backend
           usuarioRegistroId: c.usuario_registro_id.toString(),
           ticketId: c.ticket_id ?? undefined, // ✅ Convertir null a undefined
+          // ✅ NUEVO: Preservar datosTransferencia del backend
+          datosTransferencia: (c as any).datosTransferencia,
         }));
 
         console.log('🔍 loadConsumos - Consumos transformados:', consumos.length, consumos);

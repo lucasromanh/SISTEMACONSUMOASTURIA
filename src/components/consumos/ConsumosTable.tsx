@@ -11,9 +11,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useState } from 'react';
-import type { MetodoPago } from '@/types/consumos';
+import { type MetodoPago } from '@/types/consumos';
 import { TicketReceiptModal } from '@/components/tickets/TicketReceiptModal';
-import { Receipt } from 'lucide-react';
+import { Receipt, FileImage, X } from 'lucide-react';
 
 interface ConsumosTableProps {
   consumos: Consumo[];
@@ -28,6 +28,9 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  // ✅ Estado para modal de comprobante de transferencia
+  const [comprobanteModalOpen, setComprobanteModalOpen] = useState(false);
+  const [imagenComprobante, setImagenComprobante] = useState<string>('');
 
   const handlePagarConsumo = (consumo: Consumo) => {
     setConsumoAPagar(consumo);
@@ -107,7 +110,24 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                         Habitación
                       </Badge>
                     ) : consumo.metodoPago ? (
-                      <Badge variant="secondary" className="text-xs">{consumo.metodoPago}</Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">{consumo.metodoPago}</Badge>
+                        {/* ✅ NUEVO: Botón para ver comprobante de transferencia */}
+                        {consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
+                              setComprobanteModalOpen(true);
+                            }}
+                            className="h-6 w-6 p-0"
+                            title="Ver comprobante"
+                          >
+                            <FileImage className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
@@ -215,7 +235,24 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                         Cargar a Hab.
                       </Badge>
                     ) : consumo.metodoPago ? (
-                      <Badge variant="secondary" className="mt-1">{consumo.metodoPago}</Badge>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge variant="secondary">{consumo.metodoPago}</Badge>
+                        {/* ✅ Botón para ver comprobante de transferencia en móvil */}
+                        {consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
+                              setComprobanteModalOpen(true);
+                            }}
+                            className="h-7 w-7 p-0"
+                            title="Ver comprobante"
+                          >
+                            <FileImage className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
@@ -278,6 +315,47 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
         onOpenChange={setTicketModalOpen}
         ticketId={selectedTicketId}
       />
+
+      {/* ✅ Modal de Comprobante de Transferencia */}
+      <Dialog open={comprobanteModalOpen} onOpenChange={setComprobanteModalOpen}>
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] p-0 gap-0">
+          <DialogHeader className="p-4 pb-3 border-b">
+            <DialogTitle className="text-base font-semibold">
+              Comprobante de Transferencia
+            </DialogTitle>
+          </DialogHeader>
+          <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+            <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto">
+              <img
+                src={imagenComprobante}
+                alt="Comprobante de transferencia"
+                className="w-full h-auto rounded"
+              />
+            </div>
+          </div>
+          <div className="p-4 pt-3 border-t flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                // Descargar imagen
+                const link = document.createElement('a');
+                link.href = imagenComprobante;
+                link.download = `comprobante-${Date.now()}.png`;
+                link.click();
+              }}
+              className="gap-2"
+            >
+              <FileImage className="h-4 w-4" />
+              Descargar
+            </Button>
+            <Button
+              onClick={() => setComprobanteModalOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
