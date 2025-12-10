@@ -5,7 +5,7 @@ export interface MovimientoCaja {
   fecha: string;
   area: AreaConsumo;
   tipo: 'INGRESO' | 'EGRESO';
-  origen: 'CONSUMO' | 'GASTO' | 'AJUSTE' | 'INICIAL';
+  origen: 'CONSUMO' | 'GASTO' | 'AJUSTE' | 'INICIAL' | 'VENTA';
   descripcion: string;
   monto: number;
   metodoPago?: MetodoPago;

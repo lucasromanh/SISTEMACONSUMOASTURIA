@@ -1,4 +1,4 @@
-import { cajaDiariaApi } from './api.service';
+import { backendApi } from './api.service';
 import { ENDPOINTS } from '@/config/api';
 
 export interface MovimientoCajaBackend {
@@ -38,8 +38,8 @@ export interface ListMovimientosRequest {
 class MovimientosService {
     async createMovimiento(data: CreateMovimientoRequest) {
         try {
-            const response = await cajaDiariaApi.post<{ success: boolean; id: number; message?: string }>(
-                ENDPOINTS.CAJA_DIARIA.SAVE_MOVEMENT,
+            const response = await backendApi.post<{ success: boolean; id: number; message?: string }>(
+                ENDPOINTS.MOVIMIENTOS.SAVE_MOVEMENT,
                 data
             );
             return response;
@@ -55,8 +55,8 @@ class MovimientosService {
 
     async listMovimientos(params: ListMovimientosRequest) {
         try {
-            const response = await cajaDiariaApi.get<{ success: boolean; entries: MovimientoCajaBackend[]; message?: string }>(
-                ENDPOINTS.CAJA_DIARIA.GET_MOVEMENTS,
+            const response = await backendApi.get<{ success: boolean; entries: MovimientoCajaBackend[]; message?: string }>(
+                ENDPOINTS.MOVIMIENTOS.GET_MOVEMENTS,
                 { params }
             );
 
@@ -78,8 +78,8 @@ class MovimientosService {
 
     async deleteMovimiento(id: number) {
         try {
-            const response = await cajaDiariaApi.post<{ success: boolean; message?: string }>(
-                ENDPOINTS.CAJA_DIARIA.DELETE_MOVEMENT,
+            const response = await backendApi.post<{ success: boolean; message?: string }>(
+                ENDPOINTS.MOVIMIENTOS.DELETE_MOVEMENT,
                 { id }
             );
             return response;

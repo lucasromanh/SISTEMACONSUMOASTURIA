@@ -86,6 +86,7 @@ export function AdminDashboardPage() {
     const areas = ['WINNE_BAR', 'BARRA_PILETA', 'FINCA', 'RESTAURANTE'] as const;
     return areas.map((area) => {
       const areaConsumos = consumos.filter((c) => c.area === area);
+
       const total = areaConsumos.reduce((sum, c) => sum + c.total, 0);
       const totalPagado = areaConsumos
         .filter((c) => c.estado === 'PAGADO')
@@ -106,6 +107,7 @@ export function AdminDashboardPage() {
 
   const globalStats = useMemo(() => {
     const total = consumos.reduce((sum, c) => sum + c.total, 0);
+
     const totalPagado = consumos
       .filter((c) => c.estado === 'PAGADO')
       .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
@@ -113,22 +115,24 @@ export function AdminDashboardPage() {
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 
-    console.log('📊 Dashboard Global - Movimientos totales:', movimientos.length);
-    console.log('📊 Dashboard Global - Ingresos:', ingresos.length, ingresos);
-    console.log('📊 Dashboard Global - Egresos:', egresos.length, egresos);
-
     const totalIngresos = ingresos.reduce((sum, m) => sum + m.monto, 0);
     const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
 
-    console.log('📊 Dashboard Global - Total Ingresos:', totalIngresos);
-    console.log('📊 Dashboard Global - Total Egresos:', totalEgresos);
+    // ✅ Balance en Caja = Ventas Cobradas - Gastos
+    // Esto representa el dinero real que tienes en caja después de pagar gastos
+    const totalNeto = totalPagado - totalEgresos;
+
+    // ✅ Balance Proyectado = Total Ventas - Gastos
+    // Incluye ventas pendientes de cobro (cargar a habitación)
+    const totalNetoProyectado = total - totalEgresos;
 
     return {
       total,
       totalPagado,
       totalIngresos,
       totalEgresos,
-      totalNeto: totalIngresos - totalEgresos,
+      totalNeto,
+      totalNetoProyectado,
     };
   }, [consumos, movimientos]);
 
@@ -227,7 +231,7 @@ export function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 w-full">
           <Card className="w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
@@ -243,14 +247,14 @@ export function AdminDashboardPage() {
 
           <Card className="w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ingresos</CardTitle>
+              <CardTitle className="text-sm font-medium">Total Cobrado</CardTitle>
               <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-700 dark:text-green-400">
-                {formatCurrency(globalStats.totalIngresos)}
+                {formatCurrency(globalStats.totalPagado)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Efectivo + Transferencias</p>
+              <p className="text-xs text-muted-foreground mt-1">Ventas cobradas</p>
             </CardContent>
           </Card>
 
@@ -269,14 +273,27 @@ export function AdminDashboardPage() {
 
           <Card className="w-full">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Balance Neto</CardTitle>
+              <CardTitle className="text-sm font-medium">Balance en Caja</CardTitle>
+              <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                {formatCurrency(globalStats.totalNeto)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Cobrado - Gastos</p>
+            </CardContent>
+          </Card>
+
+          <Card className="w-full">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Balance Proyectado</CardTitle>
               <BarChart className="h-4 w-4 text-hotel-gold-600 dark:text-hotel-gold-400" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-hotel-gold-700 dark:text-hotel-gold-400">
-                {formatCurrency(globalStats.totalNeto)}
+                {formatCurrency(globalStats.totalNetoProyectado)}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Ingresos - Egresos</p>
+              <p className="text-xs text-muted-foreground mt-1">Total Ventas - Gastos</p>
             </CardContent>
           </Card>
         </div>

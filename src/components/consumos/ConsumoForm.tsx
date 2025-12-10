@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useConsumosStore, useCajasStore } from '@/store/consumosStore';
+import { useConsumosStore } from '@/store/consumosStore';
 import { useAuthStore } from '@/store/authStore';
 import type { AreaConsumo, EstadoConsumo, MetodoPago } from '@/types/consumos';
 import { getTodayISO } from '@/utils/dateHelpers';
@@ -321,18 +321,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       pagos = [...pagos, nuevoPago];
       montoPagadoAcumulado += montoTransferencia;
 
-      // Registrar movimiento de caja por el pago parcial
-      const { addMovimiento } = useCajasStore.getState();
-      addMovimiento({
-        fecha: fechaActual,
-        area,
-        tipo: 'INGRESO',
-        origen: 'CONSUMO',
-        descripcion: `Pago parcial - ${pedido.productos.map(p => p.nombre).join(', ')} - ${habitacionOCliente}`,
-        monto: montoTransferencia,
-        metodoPago: 'TRANSFERENCIA',
-        datosTransferencia: nuevoPago.datosTransferencia,
-      });
+      // NOTA: El backend (create_consumo_pago.php) ya se encarga de crear
+      // el movimiento de caja automáticamente en syncPagoToAreaMovementsAndCaja
+      // por lo que NO necesitamos crearlo aquí
 
       if (montoPagadoAcumulado < totalPedido) {
         // Pago parcial
@@ -946,10 +937,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
             open={mostrarComprobanteTransferencia}
             onOpenChange={(open) => {
               setMostrarComprobanteTransferencia(open);
-              if (!open) {
-                // Si se cierra sin confirmar, volver al modal de cierre
-                setMostrarModalCierre(true);
-              }
+              // ✅ CORREGIDO: No reabrir el modal de cierre automáticamente
+              // Si el usuario cancela, debe volver a hacer clic en "Cobrar"
             }}
             onConfirmar={(datos) => {
               setMostrarComprobanteTransferencia(false);

@@ -61,12 +61,10 @@ export const ENDPOINTS = {
         LIST_ITEMS: '/list_ticket_items.php',
     },
 
-    // Caja Diaria (para sincronización futura)
-    CAJA_DIARIA: {
+    // Movimientos de Caja (ahora en el backend principal)
+    MOVIMIENTOS: {
         GET_MOVEMENTS: '/get_area_movements.php',
         SAVE_MOVEMENT: '/save_area_movement.php',
-        SYNC_MOVEMENTS: '/sync_area_movements.php',
-        EDIT_MOVEMENT: '/edit_area_movement.php',
         DELETE_MOVEMENT: '/delete_area_movement.php',
     },
 };

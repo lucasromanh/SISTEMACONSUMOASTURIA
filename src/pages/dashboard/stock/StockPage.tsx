@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StockTable } from '@/components/stock/StockTable';
@@ -9,8 +9,13 @@ import { AlertTriangle, Package, TrendingDown } from 'lucide-react';
 import type { AreaConsumo } from '@/types/consumos';
 
 export function StockPage() {
-  const { items, getLowStockItems } = useStockStore();
+  const { items, getLowStockItems, loadStockItems } = useStockStore();
   const { user } = useAuthStore();
+
+  // ✅ Cargar items de stock automáticamente al montar el componente
+  useEffect(() => {
+    loadStockItems();
+  }, [loadStockItems]);
 
   const area: AreaConsumo | 'GENERAL' | undefined = useMemo(() => {
     if (!user || user.role === 'ADMIN') return undefined;

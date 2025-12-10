@@ -35,23 +35,35 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
     setPagoModalOpen(true);
   };
 
-  const confirmarPago = () => {
+  const confirmarPago = async () => {
     if (!consumoAPagar || !user) return;
 
-    updateConsumo(consumoAPagar.id, {
-      estado: 'PAGADO',
-      montoPagado: consumoAPagar.total,
-      metodoPago,
-      usuarioRegistroId: user.id.toString(),
-    });
+    try {
+      // Actualizar el consumo a PAGADO
+      // NOTA: El backend (create_consumo_pago.php) ya se encarga de crear
+      // el movimiento de caja automáticamente en syncPagoToAreaMovementsAndCaja
+      updateConsumo(consumoAPagar.id, {
+        estado: 'PAGADO',
+        montoPagado: consumoAPagar.total,
+        metodoPago,
+        usuarioRegistroId: user.id.toString(),
+      });
 
-    toast({
-      title: "✅ Pago registrado",
-      description: `Se registró el pago de ${formatCurrency(consumoAPagar.total)} para ${consumoAPagar.consumoDescripcion}`,
-    });
+      toast({
+        title: "✅ Pago registrado",
+        description: `Se registró el pago de ${formatCurrency(consumoAPagar.total)} para ${consumoAPagar.consumoDescripcion}`,
+      });
 
-    setPagoModalOpen(false);
-    setConsumoAPagar(null);
+      setPagoModalOpen(false);
+      setConsumoAPagar(null);
+    } catch (error) {
+      console.error('Error al registrar pago:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudo registrar el pago. Intenta nuevamente.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (

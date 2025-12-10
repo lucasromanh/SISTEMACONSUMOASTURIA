@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +17,7 @@ import type { AreaConsumo } from '@/types/consumos';
 
 export function CajasResumenPage() {
   const [periodo, setPeriodo] = useState<'day' | 'week' | 'month'>('day');
-  const { getMovimientosByDateRange, movimientos: allMovimientos } = useCajasStore();
+  const { getMovimientosByDateRange, movimientos: allMovimientos, loadMovimientos } = useCajasStore();
   const { user } = useAuthStore();
 
   // Determinar el área según el rol del usuario
@@ -30,18 +30,24 @@ export function CajasResumenPage() {
     return undefined;
   }, [user]);
 
+  // ✅ Cargar movimientos automáticamente cuando cambia el periodo o área
+  useEffect(() => {
+    const { start, end } = getDateRangeByPeriod(periodo);
+    loadMovimientos(area, start, end);
+  }, [periodo, area, loadMovimientos]);
+
   const movimientos = useMemo(() => {
     const { start, end } = getDateRangeByPeriod(periodo);
     return getMovimientosByDateRange(start, end, area);
   }, [periodo, area, getMovimientosByDateRange, allMovimientos]);
 
   // Separar movimientos sincronizados y no sincronizados
-  const movimientosSinSincronizar = useMemo(() => 
+  const movimientosSinSincronizar = useMemo(() =>
     movimientos.filter(m => !m.sincronizado),
     [movimientos]
   );
 
-  const movimientosSincronizados = useMemo(() => 
+  const movimientosSincronizados = useMemo(() =>
     movimientos.filter(m => m.sincronizado),
     [movimientos]
   );
