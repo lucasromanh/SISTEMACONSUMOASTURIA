@@ -31,6 +31,7 @@ export const ENDPOINTS = {
         CREATE: '/create_stock_item.php',
         UPDATE: '/update_stock_item.php',
         DELETE: '/delete_stock_item.php',
+        ALERTS: '/get_stock_alerts.php',
     },
 
     // Gastos

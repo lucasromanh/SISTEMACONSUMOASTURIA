@@ -123,6 +123,33 @@ class StockService {
             message: response.message,
         };
     }
+
+    // Obtener alertas de stock bajo/agotado
+    async getStockAlerts(area?: string): Promise<{
+        success: boolean;
+        alertas: Array<{
+            id: number;
+            area: string;
+            nombre: string;
+            categoria: string;
+            stock_actual: number;
+            stock_minimo: number;
+            unidad: string;
+            nivel_alerta: 'AGOTADO' | 'BAJO' | 'OK';
+        }>;
+        total: number;
+        message?: string;
+    }> {
+        const params = area ? `?area=${encodeURIComponent(area)}` : '';
+        const response = await backendApi.get(`${ENDPOINTS.STOCK.ALERTS}${params}`);
+
+        return {
+            success: response.success || false,
+            alertas: response.alertas || [],
+            total: response.total || 0,
+            message: response.message,
+        };
+    }
 }
 
 export const stockService = new StockService();

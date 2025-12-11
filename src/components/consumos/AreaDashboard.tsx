@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { StockAlerts } from '@/components/stock/StockAlerts';
 
 interface AreaDashboardProps {
   area: AreaConsumo;
@@ -128,7 +129,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
     // 3. Agregar consumos que no tengan movimiento asociado (evitar duplicados)
     consumos.forEach((c) => {
-      // Buscar si existe un movimiento con la misma descripciÃ³n y monto
+      // Buscar si existe un movimiento con la misma descripción y monto
       const movimientoExistente = movimientos.find((m) => m.descripcion && m.descripcion.includes(c.consumoDescripcion) && Math.abs(m.monto - (c.montoPagado || c.total)) < 0.01);
       if (!movimientoExistente) {
         const hora = new Date(c.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
@@ -243,6 +244,9 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
         {/* Formulario de registro */}
         <ConsumoForm area={area} productosPorCategoria={productosPorCategoria} />
+
+        {/* ✅ NUEVO: Alertas de stock */}
+        <StockAlerts area={area} showOnlyArea={true} />
 
         {/* Resumen del día */}
         <Card className="bg-gradient-to-br from-hotel-wine-50 to-hotel-wine-100 dark:from-zinc-900 dark:to-zinc-800 border-2 border-hotel-wine-200 dark:border-zinc-700 w-full">

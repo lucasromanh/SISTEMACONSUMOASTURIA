@@ -77,6 +77,7 @@ export interface CreatePagoResponse {
     consumo_id: number;
     monto_pagado: number;
     estado_actual: string;
+    alerta_stock?: string; // ✅ Alerta de stock bajo/agotado
     message?: string;
 }
 
@@ -162,6 +163,7 @@ class ConsumosService {
                 consumo_id: response.consumo_id || 0,
                 monto_pagado: response.monto_pagado || 0,
                 estado_actual: response.estado_actual || '',
+                alerta_stock: response.alerta_stock, // ✅ Pasar alerta al frontend
                 message: response.message,
             };
         }

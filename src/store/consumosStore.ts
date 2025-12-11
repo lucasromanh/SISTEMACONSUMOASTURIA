@@ -76,7 +76,22 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
               imagen_comprobante: consumoData.datosTransferencia?.imagenComprobante,
             };
 
-            await consumosService.createPago(pagoData);
+            const pagoResponse = await consumosService.createPago(pagoData);
+
+            // ✅ NUEVO: Capturar alerta de stock si existe
+            if (pagoResponse.alerta_stock) {
+              const { toast } = await import('@/hooks/use-toast');
+              const isCritico = pagoResponse.alerta_stock.includes('CRÍTICO') || pagoResponse.alerta_stock.includes('AGOTADO');
+
+              toast({
+                title: isCritico ? "🚨 Stock Crítico" : "⚠️ Alerta de Stock",
+                description: pagoResponse.alerta_stock,
+                variant: isCritico ? 'destructive' : 'default',
+                duration: 8000, // 8 segundos para que el usuario pueda leerlo
+              });
+            } else {
+              console.log('ℹ️ No hay alerta de stock en la respuesta');
+            }
           } catch (pagoError) {
             console.error('Error al crear pago:', pagoError);
           }

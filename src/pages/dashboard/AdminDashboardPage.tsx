@@ -16,6 +16,7 @@ import { DollarSign, TrendingUp, Wallet, BarChart, CalendarIcon } from 'lucide-r
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { StockAlerts } from '@/components/stock/StockAlerts';
 
 type PeriodoPreset = 'day' | 'week' | 'lastWeek' | 'month' | 'lastMonth' | 'custom';
 
@@ -297,6 +298,9 @@ export function AdminDashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ✅ NUEVO: Alertas de stock de todas las áreas */}
+        <StockAlerts showOnlyArea={false} />
 
         <div className="w-full">
           <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">Resumen por Área</h2>
