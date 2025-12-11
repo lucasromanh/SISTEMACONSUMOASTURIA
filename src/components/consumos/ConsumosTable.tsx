@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useState } from 'react';
 import { type MetodoPago } from '@/types/consumos';
 import { TicketReceiptModal } from '@/components/tickets/TicketReceiptModal';
-import { Receipt, FileImage, X } from 'lucide-react';
+import { Receipt, FileImage } from 'lucide-react';
 
 interface ConsumosTableProps {
   consumos: Consumo[];

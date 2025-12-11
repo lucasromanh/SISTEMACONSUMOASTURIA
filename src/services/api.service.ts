@@ -3,7 +3,7 @@ import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_CONFIG } from '@/config/api';
 
 // Tipos para respuestas del backend
-export interface ApiResponse<T = unknown> {
+export interface ApiResponse<_T = unknown> {
     success: boolean;
     message?: string;
     error?: string;

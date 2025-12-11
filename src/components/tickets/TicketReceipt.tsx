@@ -14,7 +14,7 @@ interface TicketReceiptProps {
 }
 
 export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
-    ({ ticket, items, showActions = true }, ref) => {
+    ({ ticket, items, showActions = true }, _ref) => {
         // ✅ CORREGIDO: Usar 'total' en lugar de 'monto' (nombre real en BD)
         const total = items.reduce((sum, item) => {
             const itemTotal = typeof item.total === 'string' ? parseFloat(item.total) : (item.total || 0);
