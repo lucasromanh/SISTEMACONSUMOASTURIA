@@ -131,37 +131,107 @@ export function UserManagement() {
                         <div className="text-center py-8 text-muted-foreground">No hay usuarios registrados</div>
                     ) : (
                         <div className="rounded-md border">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Usuario</TableHead>
-                                        <TableHead>Nombre</TableHead>
-                                        <TableHead>Rol</TableHead>
-                                        <TableHead>Áreas</TableHead>
-                                        <TableHead>Estado</TableHead>
-                                        <TableHead className="text-right">Acciones</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {users.map((user) => (
-                                        <TableRow key={user.id}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex items-center gap-2">
+                            {/* Vista Desktop - Tabla */}
+                            <div className="hidden md:block">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Usuario</TableHead>
+                                            <TableHead>Nombre</TableHead>
+                                            <TableHead>Rol</TableHead>
+                                            <TableHead>Áreas</TableHead>
+                                            <TableHead>Estado</TableHead>
+                                            <TableHead className="text-right">Acciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {users.map((user) => (
+                                            <TableRow key={user.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex items-center gap-2">
+                                                        {user.role === 'ADMIN' && <Shield className="h-4 w-4 text-hotel-wine-600" />}
+                                                        {user.username}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{user.display_name}</TableCell>
+                                                <TableCell>
+                                                    <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
+                                                        {ROLE_LABELS[user.role] || user.role}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {user.areas.length > 0 ? (
+                                                            user.areas.map((area) => (
+                                                                <Badge key={area.code} variant="outline" className="text-xs">
+                                                                    {area.name}
+                                                                </Badge>
+                                                            ))
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">Sin áreas</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                                                        {user.is_active ? 'Activo' : 'Inactivo'}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleEdit(user)}
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => handleDeleteClick(user)}
+                                                            disabled={user.id === currentUser.id}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Vista Móvil - Tarjetas */}
+                            <div className="md:hidden space-y-3 p-3 bg-gray-50/50 dark:bg-black/20">
+                                {users.map((user) => (
+                                    <div key={user.id} className="p-4 border rounded-lg space-y-3 bg-card shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
                                                     {user.role === 'ADMIN' && <Shield className="h-4 w-4 text-hotel-wine-600" />}
-                                                    {user.username}
+                                                    <p className="font-semibold text-lg">{user.username}</p>
                                                 </div>
-                                            </TableCell>
-                                            <TableCell>{user.display_name}</TableCell>
-                                            <TableCell>
+                                                <p className="text-sm text-muted-foreground">{user.display_name}</p>
+                                            </div>
+                                            <Badge variant={user.is_active ? 'default' : 'secondary'}>
+                                                {user.is_active ? 'Activo' : 'Inactivo'}
+                                            </Badge>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 text-sm pt-2 border-t">
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-1">Rol</p>
                                                 <Badge variant={user.role === 'ADMIN' ? 'default' : 'secondary'}>
                                                     {ROLE_LABELS[user.role] || user.role}
                                                 </Badge>
-                                            </TableCell>
-                                            <TableCell>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs text-muted-foreground mb-1">Áreas</p>
                                                 <div className="flex flex-wrap gap-1">
                                                     {user.areas.length > 0 ? (
                                                         user.areas.map((area) => (
-                                                            <Badge key={area.code} variant="outline" className="text-xs">
+                                                            <Badge key={area.code} variant="outline" className="text-[10px]">
                                                                 {area.name}
                                                             </Badge>
                                                         ))
@@ -169,35 +239,33 @@ export function UserManagement() {
                                                         <span className="text-xs text-muted-foreground">Sin áreas</span>
                                                     )}
                                                 </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={user.is_active ? 'default' : 'secondary'}>
-                                                    {user.is_active ? 'Activo' : 'Inactivo'}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleEdit(user)}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => handleDeleteClick(user)}
-                                                        disabled={user.id === currentUser.id}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end gap-2 pt-2 border-t mt-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleEdit(user)}
+                                                className="flex-1"
+                                            >
+                                                <Pencil className="h-3 w-3 mr-2" />
+                                                Editar
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => handleDeleteClick(user)}
+                                                disabled={user.id === currentUser.id}
+                                                className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                            >
+                                                <Trash2 className="h-3 w-3 mr-2" />
+                                                Eliminar
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </CardContent>
