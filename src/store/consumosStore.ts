@@ -82,35 +82,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           }
         }
 
-        // Agregar movimiento de caja para todos los consumos (mantener lógica existente)
-        const { addMovimiento } = useCajasStore.getState();
-
-        if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado) {
-          // Consumo pagado inmediatamente
-          const yaRegistradoTransferencia = newConsumo.pagos?.some(p => p.metodo === 'TRANSFERENCIA') ?? false;
-          if (!yaRegistradoTransferencia) {
-            addMovimiento({
-              fecha: newConsumo.fecha,
-              area: newConsumo.area,
-              tipo: 'INGRESO',
-              origen: 'CONSUMO',
-              descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
-              monto: newConsumo.montoPagado,
-              metodoPago: newConsumo.metodoPago || 'EFECTIVO',
-            });
-          }
-        } else if (newConsumo.estado === 'CARGAR_HABITACION') {
-          // Consumo cargado a habitación (pendiente de cobro)
-          addMovimiento({
-            fecha: newConsumo.fecha,
-            area: newConsumo.area,
-            tipo: 'INGRESO',
-            origen: 'CONSUMO',
-            descripcion: `${newConsumo.consumoDescripcion} - Hab. ${newConsumo.habitacionOCliente} (Pendiente)`,
-            monto: newConsumo.total,
-            metodoPago: undefined,
-          });
-        }
+        // ⚠️ NO crear movimientos de caja aquí - el backend ya lo hace en syncPagoToAreaMovementsAndCaja()
+        // Esto evita duplicación de movimientos en area_movements y caja diaria
 
         return true;
       }
@@ -131,20 +104,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
       ),
     }));
 
-    // Si se actualiza a PAGADO, agregar movimiento de caja (mantener lógica existente)
-    const consumoActualizado = get().consumos.find(c => c.id === id);
-    if (consumoActualizado && updates.estado === 'PAGADO' && consumoActualizado.montoPagado) {
-      const { addMovimiento } = useCajasStore.getState();
-      addMovimiento({
-        fecha: new Date().toISOString().split('T')[0],
-        area: consumoActualizado.area,
-        tipo: 'INGRESO',
-        origen: 'CONSUMO',
-        descripcion: `Pago habitación - ${consumoActualizado.consumoDescripcion} - ${consumoActualizado.habitacionOCliente}`,
-        monto: consumoActualizado.montoPagado,
-        metodoPago: consumoActualizado.metodoPago || 'EFECTIVO',
-      });
-    }
+    // ⚠️ NO crear movimientos de caja aquí - el backend ya lo hace
   },
 
   getConsumosByArea: (area) => {

@@ -225,26 +225,17 @@ try {
 
         $consumoId = (int)$pdo->lastInsertId();
 
-        // ✅ NUEVO: Reducir stock si la categoría lo requiere
-        $stockInfo = ['stock_reducido' => false];
-        if (shouldReduceStock($categoria)) {
-            $stockInfo = reducirStock($pdo, $area, $desc, $cantidad, $userId, $consumoId);
-        }
+        // ⚠️ NO reducir stock aquí - se reduce solo cuando se completa el pago en create_consumo_pago.php
+        // Esto evita duplicación de movimientos de stock
 
         $pdo->commit();
 
-        // Respuesta con información de stock
+        // Respuesta
         $response = [
             'success' => true,
             'id'      => $consumoId,
-            'total'   => $total,
-            'stock_info' => $stockInfo
+            'total'   => $total
         ];
-
-        // Agregar alerta si existe
-        if (!empty($stockInfo['alerta'])) {
-            $response['alerta_stock'] = $stockInfo['alerta'];
-        }
 
         echo json_encode($response);
 
