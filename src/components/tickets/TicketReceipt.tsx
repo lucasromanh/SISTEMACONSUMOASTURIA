@@ -1,10 +1,10 @@
-import { forwardRef } from 'react';
+import { forwardRef, useRef } from 'react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '@/utils/formatters';
 import type { Ticket, TicketItem } from '@/types/tickets';
 import { Button } from '@/components/ui/button';
-import { Printer, Download } from 'lucide-react';
+import { Download } from 'lucide-react';
 import './ticket-print.css';
 
 interface TicketReceiptProps {
@@ -21,13 +21,40 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
             return sum + itemTotal;
         }, 0);
 
-        const handlePrint = () => {
-            window.print();
-        };
+        const ticketRef = useRef<HTMLDivElement>(null);
 
-        const handleDownloadPDF = () => {
-            // TODO: Implementar descarga de PDF
-            window.print();
+        const handleDownloadImage = async () => {
+            const element = ticketRef.current;
+            if (!element) return;
+
+            try {
+                // Importar html2canvas dinámicamente
+                const html2canvas = (await import('html2canvas')).default;
+
+                // Capturar el elemento como canvas
+                const canvas = await html2canvas(element, {
+                    backgroundColor: '#ffffff',
+                    scale: 2, // Mayor resolución
+                    logging: false,
+                });
+
+                // Convertir canvas a blob
+                canvas.toBlob((blob) => {
+                    if (!blob) return;
+
+                    // Crear URL y descargar
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `ticket-${ticket.id}-${Date.now()}.png`;
+                    link.click();
+
+                    // Limpiar
+                    URL.revokeObjectURL(url);
+                });
+            } catch (error) {
+                console.error('Error al descargar ticket:', error);
+            }
         };
 
         const areaLabels: Record<string, string> = {
@@ -39,23 +66,19 @@ export const TicketReceipt = forwardRef<HTMLDivElement, TicketReceiptProps>(
 
         return (
             <div className="w-full max-w-md mx-auto">
-                {/* Botones de acción (solo en pantalla) */}
+                {/* Botón de descarga */}
                 {showActions && (
-                    <div className="flex gap-2 mb-4 print:hidden">
-                        <Button onClick={handlePrint} className="flex-1">
-                            <Printer className="h-4 w-4 mr-2" />
-                            Imprimir
-                        </Button>
-                        <Button onClick={handleDownloadPDF} variant="outline" className="flex-1">
+                    <div className="flex gap-2 mb-4">
+                        <Button onClick={handleDownloadImage} className="flex-1 bg-hotel-wine-600 hover:bg-hotel-wine-700">
                             <Download className="h-4 w-4 mr-2" />
-                            Descargar PDF
+                            Descargar Ticket
                         </Button>
                     </div>
                 )}
 
                 {/* Ticket */}
                 <div
-                    ref={ref}
+                    ref={ticketRef}
                     className="bg-white text-black p-6 rounded-lg border-2 border-gray-300 shadow-lg print:shadow-none print:border-0 print:p-0"
                     style={{ fontFamily: "'Courier New', monospace" }}
                 >
