@@ -57,11 +57,11 @@ function shouldReduceStock(string $categoria): bool {
     return true;
 }
 
-// ✅ NUEVO: Reducir stock automáticamente
+// ✅ MODIFICADO: Reducir stock automáticamente con búsqueda en cascada
 function reducirStock(PDO $pdo, string $area, string $productoNombre, float $cantidad, int $userId, int $consumoId) {
-    // Buscar el producto en stock por nombre y área
+    // 1️⃣ Buscar primero en el área específica
     $stmt = $pdo->prepare("
-        SELECT id, stock_actual, stock_minimo, nombre, categoria
+        SELECT id, stock_actual, stock_minimo, nombre, categoria, area
         FROM wb_stock_items
         WHERE area = :area AND nombre = :nombre
         LIMIT 1
@@ -73,8 +73,17 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     
     $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
     
+    // 2️⃣ Si no se encuentra, buscar en área GENERAL como fallback
     if (!$stockItem) {
-        // Si no existe en stock, no hacer nada (producto sin inventario)
+        $stmt->execute([
+            ':area' => 'GENERAL',
+            ':nombre' => $productoNombre
+        ]);
+        $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+    
+    // 3️⃣ Si aún no existe en stock, no hacer nada (producto sin inventario)
+    if (!$stockItem) {
         return [
             'stock_reducido' => false,
             'mensaje' => 'Producto no tiene inventario registrado'
@@ -84,6 +93,7 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     $stockActual = (float)$stockItem['stock_actual'];
     $stockMinimo = (float)$stockItem['stock_minimo'];
     $stockItemId = (int)$stockItem['id'];
+    $areaEncontrada = $stockItem['area'];
     
     // Verificar si hay stock disponible
     if ($stockActual <= 0) {
@@ -117,7 +127,7 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':cantidad' => $cantidad,
         ':stock_anterior' => $stockActual,
         ':stock_nuevo' => $nuevoStock,
-        ':motivo' => "Venta de consumo #{$consumoId} (pago)",
+        ':motivo' => "Venta de consumo #{$consumoId} (pago) (área: {$area}, stock desde: {$areaEncontrada})",
         ':consumo_id' => $consumoId,
         ':user_id' => $userId
     ]);
@@ -134,6 +144,7 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         'stock_reducido' => true,
         'stock_anterior' => $stockActual,
         'stock_nuevo' => $nuevoStock,
+        'area_stock' => $areaEncontrada,
         'alerta' => $alerta
     ];
 }
