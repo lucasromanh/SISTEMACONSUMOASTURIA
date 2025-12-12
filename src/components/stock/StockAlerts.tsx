@@ -45,6 +45,31 @@ export function StockAlerts({ area, showOnlyArea = false }: StockAlertsProps) {
             const response = await stockService.getStockAlerts(showOnlyArea && area ? area : undefined);
             if (response.success) {
                 setAlertas(response.alertas);
+
+                // ✅ Mostrar toast si hay alertas (solo la primera vez que se carga)
+                if (response.alertas.length > 0 && refreshKey === 0) {
+                    const agotados = response.alertas.filter(a => a.nivel_alerta === 'AGOTADO');
+                    const bajos = response.alertas.filter(a => a.nivel_alerta === 'BAJO');
+
+                    // Importar toast dinámicamente
+                    const { toast } = await import('@/hooks/use-toast');
+
+                    if (agotados.length > 0) {
+                        toast({
+                            title: "🚨 Productos Agotados",
+                            description: `Hay ${agotados.length} producto(s) sin stock. Revisar urgente.`,
+                            variant: 'destructive',
+                            duration: 10000,
+                        });
+                    } else if (bajos.length > 0) {
+                        toast({
+                            title: "⚠️ Stock Bajo",
+                            description: `Hay ${bajos.length} producto(s) con stock bajo. Reponer pronto.`,
+                            variant: 'default',
+                            duration: 8000,
+                        });
+                    }
+                }
             }
         } catch (error) {
             console.error('Error al cargar alertas de stock:', error);
