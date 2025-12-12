@@ -47,6 +47,19 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
       const response = await consumosService.createConsumo(backendData);
 
       if (response.success) {
+        // ✅ Mostrar alerta de stock si existe (desde create_consumo.php)
+        if ((response as any).alerta_stock) {
+          const { toast } = await import('@/hooks/use-toast');
+          const isCritico = (response as any).alerta_stock.includes('CRÍTICO') || (response as any).alerta_stock.includes('AGOTADO');
+
+          toast({
+            title: isCritico ? "🚨 Stock Crítico" : "⚠️ Alerta de Stock",
+            description: (response as any).alerta_stock,
+            variant: isCritico ? 'destructive' : 'default',
+            duration: 8000,
+          });
+        }
+
         // Crear consumo local con ID del backend
         const newConsumo: Consumo = {
           ...consumoData,
@@ -77,6 +90,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
             };
 
             const pagoResponse = await consumosService.createPago(pagoData);
+
+            console.log('🔍 RESPONSE createPago completa:', pagoResponse);
 
             // ✅ NUEVO: Capturar alerta de stock si existe
             if (pagoResponse.alerta_stock) {

@@ -344,23 +344,44 @@ try {
         ':cid'    => $consumo,
     ]);
 
-    // ✅ NUEVO: Reducir stock si el pago completa el consumo y la categoría lo requiere
+    // ✅ Reducir stock SOLO si aún no se ha reducido
+    // Verificar si ya existe un movimiento de stock para este consumo
     $stockInfo = ['stock_reducido' => false];
-    if ($consumoData && $estado === 'PAGADO') {
-        $area = $consumoData['area'];
-        $productoNombre = $consumoData['consumo_descripcion'];
-        $categoria = $consumoData['categoria'];
-        $cantidad = (float)$consumoData['cantidad'];
-
-        if (shouldReduceStock($categoria)) {
+    $debugInfo = [];
+    
+    if ($consumoData && shouldReduceStock($consumoData['categoria'])) {
+        // Verificar si ya se redujo el stock
+        $stmtCheck = $pdo->prepare("
+            SELECT COUNT(*) as count 
+            FROM wb_stock_movimientos 
+            WHERE consumo_id = :cid AND tipo = 'EGRESO'
+        ");
+        $stmtCheck->execute([':cid' => $consumo]);
+        $checkResult = $stmtCheck->fetch(PDO::FETCH_ASSOC);
+        
+        $debugInfo['ya_existe_movimiento'] = $checkResult['count'] > 0;
+        
+        // Solo reducir si NO existe movimiento previo
+        if ($checkResult['count'] == 0) {
+            $area = $consumoData['area'];
+            $productoNombre = $consumoData['consumo_descripcion'];
+            $categoria = $consumoData['categoria'];
+            $cantidad = (float)$consumoData['cantidad'];
+            
             try {
+                $debugInfo['intentando_reducir'] = true;
                 $stockInfo = reducirStock($pdo, $area, $productoNombre, $cantidad, $userId, $consumo);
+                $debugInfo['stock_reducido_exitoso'] = true;
             } catch (Throwable $stockErr) {
-                // Si hay error de stock, hacer rollback
+                $debugInfo['error_stock'] = $stockErr->getMessage();
                 $pdo->rollBack();
                 throw $stockErr;
             }
+        } else {
+            $debugInfo['razon_no_reduce'] = 'Stock ya fue reducido previamente';
         }
+    } else {
+        $debugInfo['razon_no_reduce'] = 'Categoría no requiere reducción de stock';
     }
 
     $pdo->commit();
@@ -379,6 +400,7 @@ try {
         'monto_pagado'   => $totalPagado,
         'estado_actual'  => $estado,
         'stock_info'     => $stockInfo,
+        'debug_info'     => $debugInfo, // ✅ Para debug en consola
     ];
 
     // Agregar alerta si existe

@@ -35,25 +35,7 @@ function requireActiveUser(PDO $pdo, int $userId) {
     }
 }
 
-// Verifica que el usuario tenga acceso a un área concreta (o sea ADMIN)
-function requireUserArea(PDO $pdo, int $userId, string $area) {
-    $stmt = $pdo->prepare("SELECT role FROM wb_users WHERE id = :id");
-    $stmt->execute([':id' => $userId]);
-    $u = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($u && $u['role'] === 'ADMIN') return;
-
-    $stmt2 = $pdo->prepare("
-        SELECT 1 FROM wb_user_areas
-        WHERE user_id = :uid AND area_code = :area
-        LIMIT 1
-    ");
-    $stmt2->execute([':uid' => $userId, ':area' => $area]);
-    if (!$stmt2->fetch()) {
-        throw new Exception("El usuario no tiene acceso al área");
-    }
-}
-
-// ✅ NUEVO: Verificar si la categoría NO debe reducir stock
+// ✅ Verificar si la categoría NO debe reducir stock
 function shouldReduceStock(string $categoria): bool {
     $categoriasExcluidas = [
         'Menu',
@@ -75,11 +57,11 @@ function shouldReduceStock(string $categoria): bool {
     return true;
 }
 
-// ✅ MODIFICADO: Reducir stock automáticamente con búsqueda en cascada
+// ✅ Reducir stock automáticamente con búsqueda en cascada
 function reducirStock(PDO $pdo, string $area, string $productoNombre, float $cantidad, int $userId, int $consumoId) {
     // 1️⃣ Buscar primero en el área específica
     $stmt = $pdo->prepare("
-        SELECT id, stock_actual, stock_minimo, nombre, area
+        SELECT id, stock_actual, stock_minimo, nombre, categoria, area
         FROM wb_stock_items
         WHERE area = :area AND nombre = :nombre
         LIMIT 1
@@ -145,7 +127,7 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':cantidad' => $cantidad,
         ':stock_anterior' => $stockActual,
         ':stock_nuevo' => $nuevoStock,
-        ':motivo' => "Venta de consumo #{$consumoId} (área: {$area}, stock desde: {$areaEncontrada})",
+        ':motivo' => "Venta de consumo #{$consumoId} (creación) (área: {$area}, stock desde: {$areaEncontrada})",
         ':consumo_id' => $consumoId,
         ':user_id' => $userId
     ]);
@@ -165,6 +147,24 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         'area_stock' => $areaEncontrada,
         'alerta' => $alerta
     ];
+}
+
+// Verifica que el usuario tenga acceso a un área concreta (o sea ADMIN)
+function requireUserArea(PDO $pdo, int $userId, string $area) {
+    $stmt = $pdo->prepare("SELECT role FROM wb_users WHERE id = :id");
+    $stmt->execute([':id' => $userId]);
+    $u = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($u && $u['role'] === 'ADMIN') return;
+
+    $stmt2 = $pdo->prepare("
+        SELECT 1 FROM wb_user_areas
+        WHERE user_id = :uid AND area_code = :area
+        LIMIT 1
+    ");
+    $stmt2->execute([':uid' => $userId, ':area' => $area]);
+    if (!$stmt2->fetch()) {
+        throw new Exception("El usuario no tiene acceso al área");
+    }
 }
 
 try {
@@ -225,17 +225,26 @@ try {
 
         $consumoId = (int)$pdo->lastInsertId();
 
-        // ⚠️ NO reducir stock aquí - se reduce solo cuando se completa el pago en create_consumo_pago.php
-        // Esto evita duplicación de movimientos de stock
+        // ✅ Reducir stock si la categoría lo requiere (para TODOS los estados)
+        $stockInfo = ['stock_reducido' => false];
+        if (shouldReduceStock($categoria)) {
+            $stockInfo = reducirStock($pdo, $area, $desc, $cantidad, $userId, $consumoId);
+        }
 
         $pdo->commit();
 
-        // Respuesta
+        // Respuesta con información de stock
         $response = [
             'success' => true,
             'id'      => $consumoId,
-            'total'   => $total
+            'total'   => $total,
+            'stock_info' => $stockInfo
         ];
+
+        // Agregar alerta si existe
+        if (!empty($stockInfo['alerta'])) {
+            $response['alerta_stock'] = $stockInfo['alerta'];
+        }
 
         echo json_encode($response);
 
