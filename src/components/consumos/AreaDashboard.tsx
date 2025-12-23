@@ -54,7 +54,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     return allConsumos.filter((c) => {
       const consumoDate = c.fecha.split(' ')[0];
       return consumoDate === fechaISO && c.area === area;
-    });
+    }).sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()); // Ordenar más reciente primero
   }, [fechaISO, area, allConsumos]);
 
   // Filtrar movimientos del día seleccionado

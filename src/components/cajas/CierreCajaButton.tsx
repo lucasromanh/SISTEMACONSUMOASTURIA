@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,7 +14,7 @@ import { Send, FileText, Loader2 } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
-import { useCajasStore } from '@/store/consumosStore';
+import { useCajasStore, useConsumosStore } from '@/store/consumosStore';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 import { getDateRangeByPeriod } from '@/utils/dateHelpers';
 import type { AreaConsumo } from '@/types/consumos';
@@ -36,44 +36,68 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
   const cierreRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const { getMovimientosByDateRange } = useCajasStore();
+  const { getConsumosByDateRange } = useConsumosStore();
   const { toast } = useToast();
 
-  // Obtener movimientos del día
+  // Obtener movimientos y consumos del día
   const { start, end } = getDateRangeByPeriod('day');
-  const movimientos = getMovimientosByDateRange(start, end, area);
+  const { loadMovimientos } = useCajasStore();
+  const { loadConsumos } = useConsumosStore();
 
-  // Calcular resumen
+  // ✅ Cargar datos al abrir el diálogo para asegurar que el reporte esté completo
+  if (open) {
+    // Esto se ejecutará cada vez que renderice abierto, pero los stores previenen loops si ya está cargando 
+    // o podríamos usar un useEffect. Usaremos useEffect en la siguiente línea.
+  }
+
+  useEffect(() => {
+    if (open) {
+      loadMovimientos(area, start, end);
+      loadConsumos(area, start, end);
+    }
+  }, [open, area, start, end, loadMovimientos, loadConsumos]);
+
+  const movimientos = getMovimientosByDateRange(start, end, area);
+  const consumos = getConsumosByDateRange(start, end, area);
+
+  // Calcular resumen usando MOVIMIENTOS + CONSUMOS
   const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
   const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 
-  const totalEfectivo = ingresos
-    .filter((m) => m.metodoPago === 'EFECTIVO' || m.origen === 'INICIAL')
+  // 1. Efectivo: Sumar movimientos INICIALES + Consumos pagados en EFECTIVO
+  // (Usamos consumos como fuente de verdad para las ventas, movimientos para caja inicial)
+  const ingresoInicial = ingresos
+    .filter((m) => m.origen === 'INICIAL')
     .reduce((sum, m) => sum + m.monto, 0);
 
-  const totalTransferencia = ingresos
-    .filter((m) => m.metodoPago === 'TRANSFERENCIA' && m.origen !== 'INICIAL')
-    .reduce((sum, m) => sum + m.monto, 0);
+  const ventasEfectivo = consumos
+    .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'EFECTIVO')
+    .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
 
+  const totalEfectivo = ingresoInicial + ventasEfectivo;
+
+  // 2. Transferencias: Sumar Consumos pagados por TRANSFERENCIA
+  const totalTransferencia = consumos
+    .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TRANSFERENCIA')
+    .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
+
+  // 3. Egresos: Sumar movimientos de egreso
   const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
+
   const totalNeto = totalEfectivo + totalTransferencia - totalEgresos;
 
-  // Obtener cargas a habitación del día
-  const cargasHabitacion: CargaHabitacion[] = [];
-  movimientos.forEach((mov) => {
-    if (mov.origen === 'CONSUMO' && mov.descripcion) {
-      // Buscar patrón "Hab. NUMERO (Pendiente)"
-      const matchHab = mov.descripcion.match(/Hab\.\s*(\d+)\s*\(Pendiente\)/);
-      if (matchHab) {
-        const habitacion = matchHab[1];
-        const existente = cargasHabitacion.find(c => c.habitacion === habitacion);
-        if (existente) {
-          existente.total += mov.monto;
-        } else {
-          cargasHabitacion.push({ habitacion, total: mov.monto });
-        }
+  // 4. Cargas a Habitación: Obtener de consumos con estado 'CARGAR_HABITACION'
+  const cargasHabitacion = consumos
+    .filter((c) => c.estado === 'CARGAR_HABITACION')
+    .reduce((acc, curr) => {
+      const existing = acc.find(item => item.habitacion === curr.habitacionOCliente);
+      if (existing) {
+        existing.total += curr.total;
+      } else {
+        acc.push({ habitacion: curr.habitacionOCliente, total: curr.total });
       }
-    }
-  });
+      return acc;
+    }, [] as CargaHabitacion[]);
 
   const totalCargasHabitacion = cargasHabitacion.reduce((sum, c) => sum + c.total, 0);
 
@@ -121,7 +145,7 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
         `🏦 *Transferencia:* ${formatCurrency(totalTransferencia)}\n` +
         (totalEgresos > 0 ? `📤 *Egresos:* ${formatCurrency(totalEgresos)}\n` : '') +
         `💰 *TOTAL NETO:* ${formatCurrency(totalNeto)}\n` +
-        (cargasHabitacion.length > 0 ? 
+        (cargasHabitacion.length > 0 ?
           `\n🏨 *Cargas a Habitación:* ${formatCurrency(totalCargasHabitacion)}\n` +
           cargasHabitacion.map(c => `  • Hab. ${c.habitacion}: ${formatCurrency(c.total)}`).join('\n')
           : ''
@@ -145,7 +169,7 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
               title: 'Cierre de Caja',
               text: `Cierre de Caja - ${areaLabel}`,
             });
-            
+
             toast({
               title: '✅ Compartido',
               description: 'Imagen compartida exitosamente',
@@ -207,7 +231,7 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button 
+        <Button
           variant={variant}
           size="sm"
           className="gap-2"
@@ -255,12 +279,12 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
               <h3 className="text-lg font-bold text-gray-800 border-b border-gray-300 pb-1">
                 💰 Resumen de Ingresos
               </h3>
-              
+
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
                 <span className="text-gray-700">💵 Efectivo:</span>
                 <span className="font-bold text-green-700 text-lg">{formatCurrency(totalEfectivo)}</span>
               </div>
-              
+
               <div className="flex justify-between items-center py-2 border-b border-gray-200">
                 <span className="text-gray-700">🏦 Transferencia:</span>
                 <span className="font-bold text-blue-700 text-lg">{formatCurrency(totalTransferencia)}</span>
@@ -285,7 +309,7 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
                 <h3 className="text-lg font-bold text-gray-800 border-b border-gray-300 pb-1">
                   🏨 Cargas a Habitación (Pendientes de Cobro)
                 </h3>
-                
+
                 <div className="space-y-2">
                   {cargasHabitacion.map((carga) => (
                     <div

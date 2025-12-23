@@ -73,7 +73,7 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
     <>
       {/* Vista Desktop */}
       <div className="hidden md:block w-full">
-        <ScrollArea className="h-[600px] w-full rounded-md border">
+        <ScrollArea className="h-[calc(100vh-350px)] min-h-[400px] w-full rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -167,105 +167,116 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
 
       {/* Vista Móvil */}
       <div className="md:hidden">
-        <ScrollArea className="h-[600px]">
-          <div className="space-y-3 w-full">
-            {consumos.map((consumo) => (
-              <div key={consumo.id} className="p-3 border rounded-lg space-y-2 bg-card w-full">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-lg">{consumo.consumoDescripcion}</p>
-                    <p className="text-sm text-muted-foreground">{consumo.habitacionOCliente}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <StatusBadge estado={consumo.estado} />
-                    {consumo.estado === 'CARGAR_HABITACION' && (
-                      <Button
-                        size="sm"
-                        onClick={() => handlePagarConsumo(consumo)}
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        💰 Pagar
-                      </Button>
-                    )}
-                  </div>
+        <div className="space-y-3 w-full pb-20"> {/* pb-20 para dar espacio al scroll final */}
+          {consumos.map((consumo) => (
+            <div key={consumo.id} className="p-3 border rounded-lg space-y-2 bg-card w-full shadow-sm">
+              <div className="flex justify-between items-start">
+                <div className="min-w-0 max-w-[60%]">
+                  <p className="font-semibold text-lg leading-tight truncate">{consumo.consumoDescripcion}</p>
+                  <p className="text-sm text-muted-foreground truncate">{consumo.habitacionOCliente}</p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Fecha</p>
-                    <p className="font-medium">{formatDate(consumo.fecha)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Categoría</p>
-                    <Badge variant="outline" className="mt-1">{consumo.categoria}</Badge>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Cantidad</p>
-                    <p className="font-medium">{consumo.cantidad}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Precio Unit.</p>
-                    <p className="font-medium">{formatCurrency(consumo.precioUnitario)}</p>
-                  </div>
-                </div>
-
-                {/* Botón Ver Ticket - Solo si tiene ticketId */}
-                {consumo.ticketId && (
-                  <div className="pt-2 border-t">
+                <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                  <StatusBadge estado={consumo.estado} />
+                  {consumo.estado === 'CARGAR_HABITACION' && (
                     <Button
                       size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedTicketId(consumo.ticketId!);
-                        setTicketModalOpen(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2"
+                      onClick={() => handlePagarConsumo(consumo)}
+                      className="bg-green-600 hover:bg-green-700 text-white h-7 px-2 text-xs"
                     >
-                      <Receipt className="h-4 w-4" />
-                      Ver Ticket de Facturación
+                      💰 Pagar
                     </Button>
-                  </div>
-                )}
+                  )}
+                </div>
+              </div>
 
-                <div className="pt-2 border-t flex justify-between items-center">
+              <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 p-2 rounded">
+                <div>
+                  <p className="text-xs text-muted-foreground">Fecha</p>
+                  <p className="font-medium">{formatDate(consumo.fecha)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Categoría</p>
+                  <Badge variant="outline" className="mt-0.5 text-[10px] h-5 px-1.5">{consumo.categoria}</Badge>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Cantidad</p>
+                  <p className="font-medium">{consumo.cantidad}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Precio Unit.</p>
+                  <p className="font-medium">{formatCurrency(consumo.precioUnitario)}</p>
+                </div>
+              </div>
+
+              {/* Botón Ver Ticket - Solo si tiene ticketId */}
+              {consumo.ticketId && (
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTicketId(consumo.ticketId!);
+                      setTicketModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 h-8 text-xs"
+                  >
+                    <Receipt className="h-3.5 w-3.5" />
+                    Ver Ticket de Facturación
+                  </Button>
+                </div>
+              )}
+
+              <div className="pt-2 border-t space-y-3">
+                <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-muted-foreground">Método de Pago</p>
+                    <p className="text-xs text-muted-foreground mb-1">Método de Pago</p>
                     {consumo.estado === 'CARGAR_HABITACION' ? (
-                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 mt-1">
+                      <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
                         Cargar a Hab.
                       </Badge>
                     ) : consumo.metodoPago ? (
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary">{consumo.metodoPago}</Badge>
-                        {/* ✅ Botón para ver comprobante de transferencia en móvil */}
-                        {consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
-                              setComprobanteModalOpen(true);
-                            }}
-                            className="h-7 w-7 p-0"
-                            title="Ver comprobante"
-                          >
-                            <FileImage className="h-4 w-4 text-blue-600" />
-                          </Button>
-                        )}
-                      </div>
+                      <Badge variant="secondary" className="font-medium">
+                        {consumo.metodoPago}
+                      </Badge>
                     ) : (
                       <span className="text-muted-foreground text-xs">-</span>
                     )}
                   </div>
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground">Total</p>
-                    <p className="text-2xl font-bold text-hotel-wine-700 dark:text-hotel-wine-400">{formatCurrency(consumo.total)}</p>
+                    <p className="text-xl font-bold text-hotel-wine-700 dark:text-hotel-wine-400">
+                      {formatCurrency(consumo.total)}
+                    </p>
                   </div>
                 </div>
+
+                {/* ✅ Botón de Comprobante FULL WIDTH y separado */}
+                {consumo.metodoPago === 'TRANSFERENCIA' && (
+                  <div className="w-full">
+                    {(consumo as any).datosTransferencia?.imagenComprobante ? (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
+                          setComprobanteModalOpen(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60"
+                      >
+                        <FileImage className="h-4 w-4" />
+                        Comprobante Transferencia
+                      </Button>
+                    ) : (
+                      <div className="w-full py-1.5 bg-gray-100 dark:bg-gray-800 rounded text-center text-xs text-muted-foreground italic">
+                        (Sin comprobante adjunto)
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
-          </div>
-        </ScrollArea>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Modal de Pago */}
