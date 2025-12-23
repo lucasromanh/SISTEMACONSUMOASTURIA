@@ -16,6 +16,7 @@ import { useAuthStore } from '@/store/authStore';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { CierreCajaButton } from '@/components/cajas/CierreCajaButton';
+import { EnviarCargosHabitacionButton } from '@/components/cajas/EnviarCargosHabitacionButton';
 
 interface NavItem {
   title: string;
@@ -187,9 +188,19 @@ export function Sidebar({ onNavigate }: SidebarProps = {}) {
         <Separator className="my-4" />
 
         {/* Botón de Cierre de Caja */}
-        <div className="px-3 pb-3">
+        {/* Botón de Cierre de Caja */}
+        <div className="px-3 pb-3 space-y-2">
           <p className="px-3 py-2 text-xs font-semibold text-muted-foreground">CIERRE DE CAJA</p>
           <CierreCajaButton
+            variant="outline"
+            area={user.role === 'ADMIN' ? undefined :
+              user.role === 'WINNE_BAR' ? 'WINNE_BAR' :
+                user.role === 'BARRA_PILETA' ? 'BARRA_PILETA' :
+                  user.role === 'FINCA' ? 'FINCA' :
+                    user.role === 'RESTAURANTE' ? 'RESTAURANTE' : undefined
+            }
+          />
+          <EnviarCargosHabitacionButton
             variant="outline"
             area={user.role === 'ADMIN' ? undefined :
               user.role === 'WINNE_BAR' ? 'WINNE_BAR' :

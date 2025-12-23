@@ -25,11 +25,11 @@ export function TopBar({ sidebarOpen, setSidebarOpen }: TopBarProps) {
   if (!user) return null;
 
   return (
-    <header className="sticky top-0 z-40 border-b bg-background">
+    <header className="sticky top-0 z-50 border-b bg-background">
       <div className="flex h-16 items-center justify-between px-3 sm:px-4">
         <div className="flex items-center gap-2 sm:gap-4">
           {/* Mobile Menu */}
-          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen} direction="left">
             <SheetTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon">
                 <Menu className="h-5 w-5" />
