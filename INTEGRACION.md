@@ -177,6 +177,7 @@ setResultados(null);
 const totalASincronizar = datosParaSincronizar.reduce((sum, d) => sum + d.ingreso, 0);
 
 return (
+
 <Dialog open={open} onOpenChange={setOpen}>
 <DialogTrigger asChild>
 <Button variant="outline" className="gap-2">
@@ -411,3 +412,5 @@ cierreCaja: dato.total,
 fecha: dato.fecha,
 origen: 'SINCRONIZADO' // Nuevo campo
 };
+
+ocr-pdf no imagen
