@@ -418,7 +418,15 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           
           const pagosTarjeta = pagos.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
           if (pagosTarjeta.length > 0) {
-            consumoData.datosTarjeta = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
+            const datosTarjetaPago = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
+            // Extraer imagen_comprobante como campo separado
+            if (datosTarjetaPago) {
+              const { imagenComprobante, ...datosTarjetaSinImagen } = datosTarjetaPago;
+              consumoData.datosTarjeta = datosTarjetaSinImagen;
+              if (imagenComprobante) {
+                consumoData.imagenComprobante = imagenComprobante;
+              }
+            }
           }
         }
         addConsumo(consumoData);

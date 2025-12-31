@@ -61,15 +61,19 @@ try {
     $role = requireActiveUser($pdo, $userId);
 
     // ✅ MODIFICADO: Agregar LEFT JOIN con wb_consumo_pagos para traer datos de transferencia
+    // También traer datos_tarjeta e imagen_comprobante de wb_consumos
     $sql = "SELECT c.*, u.username AS usuario_registro,
+                   c.datos_tarjeta AS consumo_datos_tarjeta,
+                   c.imagen_comprobante AS consumo_imagen_comprobante,
                    p.imagen_comprobante,
                    p.numero_operacion,
                    p.banco,
                    p.alias_cbu,
-                   p.hora AS hora_transferencia
+                   p.hora AS hora_transferencia,
+                   p.datos_tarjeta AS pago_datos_tarjeta
             FROM wb_consumos c
             LEFT JOIN wb_users u ON u.id = c.usuario_registro_id
-            LEFT JOIN wb_consumo_pagos p ON p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA'
+            LEFT JOIN wb_consumo_pagos p ON p.consumo_id = c.id
             WHERE 1=1";
     $params = [];
 
@@ -103,11 +107,11 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // ✅ NUEVO: Formatear datos de transferencia como objeto JSON
+    // ✅ NUEVO: Formatear datos de transferencia y tarjeta como objetos JSON
     $consumos = array_map(function($row) {
         $consumo = $row;
         
-        // Si tiene datos de transferencia, crear objeto datosTransferencia
+        // Si tiene datos de transferencia desde wb_consumo_pagos, crear objeto datosTransferencia
         if (!empty($row['imagen_comprobante'])) {
             $consumo['datosTransferencia'] = [
                 'imagenComprobante' => $row['imagen_comprobante'],
@@ -118,12 +122,25 @@ try {
             ];
         }
         
+        // Si tiene datos de tarjeta desde wb_consumos o wb_consumo_pagos
+        $datosTarjetaJson = $row['consumo_datos_tarjeta'] ?: $row['pago_datos_tarjeta'];
+        if (!empty($datosTarjetaJson)) {
+            $consumo['datosTarjeta'] = json_decode($datosTarjetaJson, true);
+            // Agregar imagen del comprobante al objeto datosTarjeta si existe
+            if (!empty($row['consumo_imagen_comprobante'])) {
+                $consumo['datosTarjeta']['imagenComprobante'] = $row['consumo_imagen_comprobante'];
+            }
+        }
+        
         // Remover campos duplicados
         unset($consumo['imagen_comprobante']);
         unset($consumo['numero_operacion']);
         unset($consumo['banco']);
         unset($consumo['alias_cbu']);
         unset($consumo['hora_transferencia']);
+        unset($consumo['consumo_datos_tarjeta']);
+        unset($consumo['consumo_imagen_comprobante']);
+        unset($consumo['pago_datos_tarjeta']);
         
         return $consumo;
     }, $rows);

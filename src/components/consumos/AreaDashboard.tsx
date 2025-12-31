@@ -348,12 +348,27 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                         <p className="text-xs sm:text-sm text-muted-foreground">
                           {transaccion.metodoPago === 'EFECTIVO' && '💵 Efectivo'}
                           {transaccion.metodoPago === 'TRANSFERENCIA' && '🏦 Transferencia'}
+                          {transaccion.metodoPago === 'TARJETA_CREDITO' && '💳 Tarjeta'}
                           {transaccion.metodoPago === 'CARGAR_HABITACION' && '🏨 Cargado a Habitación'}
                         </p>
                         {transaccion.metodoPago === 'TRANSFERENCIA' && (transaccion as any).datosTransferencia?.imagenComprobante && (
                           <button
                             onClick={() => {
                               const img = (transaccion as any).datosTransferencia.imagenComprobante;
+                              const w = window.open();
+                              if (w) {
+                                w.document.write(`<img src="${img}" style="max-width:100%"/>`);
+                              }
+                            }}
+                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            Ver comprobante
+                          </button>
+                        )}
+                        {transaccion.metodoPago === 'TARJETA_CREDITO' && (transaccion as any).datosTarjeta?.imagenComprobante && (
+                          <button
+                            onClick={() => {
+                              const img = (transaccion as any).datosTarjeta.imagenComprobante;
                               const w = window.open();
                               if (w) {
                                 w.document.write(`<img src="${img}" style="max-width:100%"/>`);

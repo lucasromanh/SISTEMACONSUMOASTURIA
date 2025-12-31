@@ -15,6 +15,8 @@ export interface CreateConsumoRequest {
     ticket_id?: number;
     metodo_pago?: string | null; // ✅ Método de pago
     monto_pagado?: number | null; // ✅ Monto pagado
+    datos_tarjeta?: any; // ✅ Datos de tarjeta de crédito/débito
+    imagen_comprobante?: string; // ✅ Imagen del comprobante (base64)
 }
 
 export interface CreateConsumoResponse {
@@ -45,6 +47,8 @@ export interface ConsumoBackend {
     estado: string;
     monto_pagado: number | null;
     metodo_pago: string | null; // ✅ Agregado
+    datos_tarjeta?: any; // ✅ Datos de tarjeta
+    imagen_comprobante?: string; // ✅ Imagen del comprobante
     usuario_registro_id: number;
     ticket_id: number | null;
     usuario_registro: string;
@@ -61,7 +65,7 @@ export interface CreatePagoRequest {
     user_id: number;
     consumo_id: number;
     fecha: string; // YYYY-MM-DD
-    metodo: 'EFECTIVO' | 'TRANSFERENCIA' | 'CARGAR_HABITACION';
+    metodo: 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION';
     monto: number;
     // Datos de transferencia (opcionales)
     hora?: string;
@@ -69,6 +73,8 @@ export interface CreatePagoRequest {
     banco?: string;
     numero_operacion?: string;
     imagen_comprobante?: string;
+    // Datos de tarjeta (opcionales)
+    datos_tarjeta?: any;
 }
 
 export interface CreatePagoResponse {
@@ -93,6 +99,7 @@ export interface PagoBackend {
     banco: string | null;
     numero_operacion: string | null;
     imagen_comprobante: string | null;
+    datos_tarjeta?: any; // ✅ Datos de tarjeta
     usuario_registro: string;
 }
 
