@@ -172,6 +172,18 @@ try {
     $estado   = trim($data['estado'] ?? 'CARGAR_HABITACION');
     $ticketId = isset($data['ticket_id']) ? (int)$data['ticket_id'] : null;
     
+    // 🐛 DEBUG CRÍTICO: Ver qué llega en metodo_pago ANTES de procesar
+    error_log("🔍 CREATE_CONSUMO - RAW DATA metodo_pago: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true));
+    error_log("🔍 CREATE_CONSUMO - RAW DATA completo: " . json_encode($data));
+    
+    // 🔍 ESCRIBIR DEBUG A ARCHIVO
+    $debugFile = __DIR__ . '/debug_create_consumo.txt';
+    file_put_contents($debugFile, 
+        date('Y-m-d H:i:s') . " - metodo_pago recibido: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n" .
+        "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n\n",
+        FILE_APPEND
+    );
+    
     $metodoPago = trim($data['metodo_pago'] ?? '');
     $montoPagado = isset($data['monto_pagado']) ? (float)$data['monto_pagado'] : null;
     
@@ -247,6 +259,17 @@ try {
             ':uid'         => $userId,
             ':ticket_id'   => $ticketId ?: null,
         ]);
+        
+        // 🐛 DEBUG: Ver qué se insertó
+        error_log("✅ CREATE_CONSUMO - INSERT ejecutado con metodo_pago: " . var_export($metodoPago ?: null, true));
+        
+        // 🔍 ESCRIBIR DEBUG A ARCHIVO
+        $debugFile = __DIR__ . '/debug_create_consumo.txt';
+        file_put_contents($debugFile, 
+            date('Y-m-d H:i:s') . " - metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
+            "estado: $estado, montoPagado: $montoPagado\n\n",
+            FILE_APPEND
+        );
 
         $consumoId = (int)$pdo->lastInsertId();
 
