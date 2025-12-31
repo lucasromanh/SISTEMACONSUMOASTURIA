@@ -20,18 +20,21 @@ interface DatosTransferencia {
   aliasCbu: string;
   banco: string;
   numeroOperacion: string;
+  imagenComprobante?: string; // Base64 de la imagen capturada
 }
 
 interface ComprobanteTransferenciaModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirmar: (datos: DatosTransferencia) => void;
+  esTarjeta?: boolean; // Nuevo: indica si es para captura de tarjeta (solo imagen)
 }
 
 export function ComprobanteTransferenciaModal({
   open,
   onOpenChange,
   onConfirmar,
+  esTarjeta = false,
 }: ComprobanteTransferenciaModalProps) {
   const [procesando, setProcesando] = useState(false);
   const [imagenCapturada, setImagenCapturada] = useState<string | null>(null);
@@ -545,7 +548,31 @@ export function ComprobanteTransferenciaModal({
 
   // Confirmar y enviar datos
   const handleConfirmar = () => {
-    // Validar campos obligatorios
+    // Si es para tarjeta, solo validamos que haya imagen
+    if (esTarjeta) {
+      if (!imagenCapturada) {
+        toast({
+          variant: 'destructive',
+          title: '❌ Falta la imagen',
+          description: 'Debe capturar o cargar el comprobante del posnet',
+        });
+        return;
+      }
+      
+      // Solo enviamos la imagen para tarjeta
+      onConfirmar({
+        monto: '',
+        hora: '',
+        aliasCbu: '',
+        banco: '',
+        numeroOperacion: '',
+        imagenComprobante: imagenCapturada,
+      });
+      handleCerrar();
+      return;
+    }
+
+    // Validar campos obligatorios para transferencia
     if (!datosDetectados.monto || !datosDetectados.numeroOperacion) {
       toast({
         variant: 'destructive',
@@ -558,7 +585,7 @@ export function ComprobanteTransferenciaModal({
     // Incluir la imagen del comprobante en los datos
     const datosCompletos = {
       ...datosDetectados,
-      imagenComprobante: imagenCapturada, // Base64 de la imagen
+      imagenComprobante: imagenCapturada || undefined, // Base64 de la imagen
     };
 
     onConfirmar(datosCompletos);
@@ -582,15 +609,15 @@ export function ComprobanteTransferenciaModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>📸 Registrar Transferencia</DialogTitle>
+          <DialogTitle>{esTarjeta ? '💳 Comprobante de Tarjeta' : '📸 Registrar Transferencia'}</DialogTitle>
           <DialogDescription>
-            Saca una foto del comprobante
+            {esTarjeta ? 'Captura el ticket del posnet con los datos de la operación' : 'Saca una foto del comprobante'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Toggle entre modo OCR y modo manual */}
-          {!imagenCapturada && (
+          {!imagenCapturada && !esTarjeta && (
             <div className="flex gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
               <Button
                 type="button"
@@ -692,7 +719,7 @@ export function ComprobanteTransferenciaModal({
           )}
 
           {/* Formulario con datos detectados */}
-          {imagenCapturada && !procesando && (
+          {imagenCapturada && !procesando && !esTarjeta && (
             <div className="space-y-4 border-t pt-4">
               <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" />
@@ -788,6 +815,19 @@ export function ComprobanteTransferenciaModal({
               </div>
             </div>
           )}
+          
+          {/* Mensaje para captura de tarjeta */}
+          {imagenCapturada && !procesando && esTarjeta && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <CheckCircle className="h-4 w-4" />
+                <span className="font-medium">✅ Comprobante capturado correctamente</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                El ticket del posnet ha sido guardado. Asegúrate de que los datos estén visibles en la imagen.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="gap-2">
@@ -797,10 +837,10 @@ export function ComprobanteTransferenciaModal({
           <Button
             type="button"
             onClick={handleConfirmar}
-            disabled={!imagenCapturada || procesando || !datosDetectados.monto || !datosDetectados.numeroOperacion}
+            disabled={!imagenCapturada || procesando || (!esTarjeta && (!datosDetectados.monto || !datosDetectados.numeroOperacion))}
           >
             <CheckCircle className="h-4 w-4 mr-2" />
-            Confirmar Transferencia
+            {esTarjeta ? 'Confirmar Comprobante' : 'Confirmar Transferencia'}
           </Button>
         </DialogFooter>
       </DialogContent>

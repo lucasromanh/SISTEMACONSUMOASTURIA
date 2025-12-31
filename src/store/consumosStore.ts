@@ -119,7 +119,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           total: c.total,
           estado: c.estado as 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL',
           montoPagado: c.monto_pagado || null,
-          metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | null,
+          metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
           usuarioRegistroId: c.usuario_registro_id.toString(),
           ticketId: c.ticket_id || undefined,
         }));

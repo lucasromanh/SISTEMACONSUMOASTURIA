@@ -1,6 +1,23 @@
 export type EstadoConsumo = 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL';
 
-export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA' | null;
+export type MetodoPago = 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null;
+
+export interface DatosTarjeta {
+  cuotas: number;
+  numeroAutorizacion: string;
+  tipoTarjeta: 'CREDITO' | 'DEBITO';
+  marcaTarjeta: 'VISA' | 'MASTERCARD' | 'AMEX' | 'CABAL' | 'NARANJA' | 'MAESTRO' | string;
+  numeroCupon?: string;
+  estado: 'APROBADO';
+}
+
+export interface DatosTransferencia {
+  hora?: string;
+  aliasCbu?: string;
+  banco?: string;
+  numeroOperacion?: string;
+  imagenComprobante?: string;
+}
 
 export type AreaConsumo = 'WINNE_BAR' | 'BARRA_PILETA' | 'FINCA' | 'RESTAURANTE';
 
@@ -10,13 +27,9 @@ export interface PagoRegistrado {
   metodo: MetodoPago;
   monto: number;
   usuarioRegistroId: string;
-  datosTransferencia?: {
-    hora?: string;
-    aliasCbu?: string;
-    banco?: string;
-    numeroOperacion?: string;
-    imagenComprobante?: string;
-  };
+  datosTransferencia?: DatosTransferencia;
+  datosTarjeta?: DatosTarjeta;
+  imagenComprobante?: string; // Base64 del comprobante (transferencia o tarjeta)
 }
 
 export interface Consumo {
@@ -43,7 +56,7 @@ export interface Consumo {
     hora?: string;
     aliasCbu?: string;
     banco?: string;
-    numeroOperacion?: string;
-    imagenComprobante?: string;
-  };
-}
+    numeroOperacion?: sDatosTransferencia;
+  
+  // Datos de tarjeta de crédito (deprecated, usar pagos[])
+  datosTarjeta?: DatosTarjeta
