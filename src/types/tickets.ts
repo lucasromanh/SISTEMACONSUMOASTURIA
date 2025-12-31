@@ -44,6 +44,7 @@ export interface CloseTicketRequest {
     fecha_cierre: string;
     total_efectivo?: number;
     total_transferencia?: number;
+    total_tarjeta?: number;
     total_habitacion?: number;
     notas_cierre?: string;
 }
