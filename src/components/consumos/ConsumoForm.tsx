@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import { ComprobanteTransferenciaModal } from '@/components/cajas/ComprobanteTransferenciaModal';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle2 } from 'lucide-react';
 import { ticketsService } from '@/services/tickets.service';
 import {
@@ -292,8 +292,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
 
 
-  // Procesar cierre de pedido (con o sin datos de transferencia)
-  const procesarCierrePedido = (datosTransferencia: any) => {
+  // Procesar cierre de pedido (con o sin datos de transferencia/tarjeta)
+  const procesarCierrePedido = (datosComprobanteOTarjeta: any) => {
 
     const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
     if (!pedido) return;
@@ -307,9 +307,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     let montoPagadoTotal: number | null = null;
 
     // Si es transferencia, validar el monto y registrar pago parcial
-    if (datosTransferencia && metodoPago === 'TRANSFERENCIA') {
+    if (datosComprobanteOTarjeta && metodoPago === 'TRANSFERENCIA') {
       // Asegurar que el monto es número real, no string decimal
-      let montoTransferencia = parseMonto(datosTransferencia.monto);
+      let montoTransferencia = parseMonto(datosComprobanteOTarjeta.monto);
       // Registrar pago parcial en el array de pagos
       const nuevoPago: PagoRegistrado = {
         id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -318,11 +318,11 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         monto: montoTransferencia,
         usuarioRegistroId: user?.id ? String(user.id) : '',
         datosTransferencia: {
-          hora: datosTransferencia.hora,
-          aliasCbu: datosTransferencia.aliasCbu,
-          banco: datosTransferencia.banco,
-          numeroOperacion: datosTransferencia.numeroOperacion,
-          imagenComprobante: datosTransferencia.imagenComprobante,
+          hora: datosComprobanteOTarjeta.hora,
+          aliasCbu: datosComprobanteOTarjeta.aliasCbu,
+          banco: datosComprobanteOTarjeta.banco,
+          numeroOperacion: datosComprobanteOTarjeta.numeroOperacion,
+          imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
         },
       };
       pagos = [...pagos, nuevoPago];
@@ -362,6 +362,34 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       }
     }
 
+    // Si es tarjeta de crédito, validar y registrar pago
+    if (datosComprobanteOTarjeta && metodoPago === 'TARJETA_CREDITO') {
+      // Para tarjeta, el monto es el total del pedido (no permite pagos parciales en este flujo)
+      const montoTarjeta = totalPedido;
+      
+      const nuevoPago: PagoRegistrado = {
+        id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        fecha: fechaActual,
+        metodo: 'TARJETA_CREDITO',
+        monto: montoTarjeta,
+        usuarioRegistroId: user?.id ? String(user.id) : '',
+        datosTarjeta: {
+          cuotas: datosComprobanteOTarjeta.cuotas,
+          numeroAutorizacion: datosComprobanteOTarjeta.numeroAutorizacion,
+          tipoTarjeta: datosComprobanteOTarjeta.tipoTarjeta,
+          marcaTarjeta: datosComprobanteOTarjeta.marcaTarjeta,
+          numeroCupon: datosComprobanteOTarjeta.numeroCupon,
+          estado: 'APROBADO',
+          imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
+        },
+      };
+      
+      pagos = [...pagos, nuevoPago];
+      montoPagadoAcumulado += montoTarjeta;
+      estadoFinal = 'PAGADO';
+      montoPagadoTotal = montoPagadoAcumulado;
+    }
+
     // Función auxiliar para registrar consumos (pagados o cargados a habitación)
     const registrarConsumos = (estadoAUsar: string, montoPagadoPorProducto?: number) => {
       pedido.productos.forEach((producto) => {
@@ -381,11 +409,16 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           ticketId: pedido.ticketId, // Vincular consumo con ticket
           pagos: pagos,
         };
-        // Si hubo pagos parciales con transferencia, pasar los comprobantes
+        // Si hubo pagos con transferencia o tarjeta, pasar los datos
         if (pagos && pagos.length > 0) {
           const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
           if (pagosTransfer.length > 0) {
             consumoData.datosTransferencia = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
+          }
+          
+          const pagosTarjeta = pagos.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
+          if (pagosTarjeta.length > 0) {
+            consumoData.datosTarjeta = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
           }
         }
         addConsumo(consumoData);
@@ -814,6 +847,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
                   Confirmar cierre de pedido
                 </DialogTitle>
+                <DialogDescription>
+                  Revisa los datos del pedido antes de confirmar el cierre
+                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
@@ -898,7 +934,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                           });
                           return;
                         }
-                        if (estado === 'PAGADO' && metodoPago === 'TRANSFERENCIA') {
+                        if (estado === 'PAGADO' && (metodoPago === 'TRANSFERENCIA' || metodoPago === 'TARJETA_CREDITO')) {
                           setMostrarModalCierre(false);
                           setMostrarComprobanteTransferencia(true);
                         } else {
@@ -946,9 +982,10 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
             </AlertDialogContent>
           </AlertDialog>
 
-          {/* Modal de comprobante de transferencia */}
+          {/* Modal de comprobante de transferencia o tarjeta */}
           <ComprobanteTransferenciaModal
             open={mostrarComprobanteTransferencia}
+            esTarjeta={metodoPago === 'TARJETA_CREDITO'}
             onOpenChange={(open) => {
               setMostrarComprobanteTransferencia(open);
               // ✅ CORREGIDO: No reabrir el modal de cierre automáticamente

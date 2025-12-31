@@ -9,6 +9,7 @@ export interface DatosTarjeta {
   marcaTarjeta: 'VISA' | 'MASTERCARD' | 'AMEX' | 'CABAL' | 'NARANJA' | 'MAESTRO' | string;
   numeroCupon?: string;
   estado: 'APROBADO';
+  imagenComprobante?: string; // Base64 de la imagen del ticket del posnet
 }
 
 export interface DatosTransferencia {

@@ -46,6 +46,16 @@ export function ComprobanteTransferenciaModal({
     banco: '',
     numeroOperacion: '',
   });
+  
+  // Estados para datos de tarjeta
+  const [datosTarjeta, setDatosTarjeta] = useState({
+    cuotas: 1,
+    numeroAutorizacion: '',
+    tipoTarjeta: 'DEBITO' as 'CREDITO' | 'DEBITO',
+    marcaTarjeta: '',
+    numeroCupon: '',
+  });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -548,7 +558,7 @@ export function ComprobanteTransferenciaModal({
 
   // Confirmar y enviar datos
   const handleConfirmar = () => {
-    // Si es para tarjeta, solo validamos que haya imagen
+    // Si es para tarjeta, validar campos obligatorios
     if (esTarjeta) {
       if (!imagenCapturada) {
         toast({
@@ -559,15 +569,25 @@ export function ComprobanteTransferenciaModal({
         return;
       }
       
-      // Solo enviamos la imagen para tarjeta
+      if (!datosTarjeta.numeroAutorizacion.trim()) {
+        toast({
+          variant: 'destructive',
+          title: '❌ Datos incompletos',
+          description: 'El número de autorización es obligatorio',
+        });
+        return;
+      }
+      
+      // Enviar datos completos de tarjeta
       onConfirmar({
-        monto: '',
+        monto: '', // No se usa para tarjeta
         hora: '',
         aliasCbu: '',
         banco: '',
         numeroOperacion: '',
         imagenComprobante: imagenCapturada,
-      });
+        ...datosTarjeta, // Incluir todos los datos de tarjeta
+      } as any);
       handleCerrar();
       return;
     }
@@ -601,6 +621,13 @@ export function ComprobanteTransferenciaModal({
       aliasCbu: '',
       banco: '',
       numeroOperacion: '',
+    });
+    setDatosTarjeta({
+      cuotas: 1,
+      numeroAutorizacion: '',
+      tipoTarjeta: 'DEBITO',
+      marcaTarjeta: '',
+      numeroCupon: '',
     });
     onOpenChange(false);
   };
@@ -816,16 +843,75 @@ export function ComprobanteTransferenciaModal({
             </div>
           )}
           
-          {/* Mensaje para captura de tarjeta */}
+          {/* Formulario para datos de tarjeta */}
           {imagenCapturada && !procesando && esTarjeta && (
             <div className="space-y-4 border-t pt-4">
               <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
                 <CheckCircle className="h-4 w-4" />
-                <span className="font-medium">✅ Comprobante capturado correctamente</span>
+                <span className="font-medium">✅ Comprobante capturado - Completa los datos del posnet</span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                El ticket del posnet ha sido guardado. Asegúrate de que los datos estén visibles en la imagen.
-              </p>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cuotas" className="text-sm">Cuotas</Label>
+                  <Input
+                    id="cuotas"
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={datosTarjeta.cuotas}
+                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, cuotas: parseInt(e.target.value) || 1 })}
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="numeroAutorizacion" className="text-sm text-red-600 dark:text-red-400">Número de Autorización *</Label>
+                  <Input
+                    id="numeroAutorizacion"
+                    placeholder="123456"
+                    value={datosTarjeta.numeroAutorizacion}
+                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, numeroAutorizacion: e.target.value })}
+                    className="h-10"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="tipoTarjeta" className="text-sm">Tipo de Tarjeta</Label>
+                  <select
+                    id="tipoTarjeta"
+                    value={datosTarjeta.tipoTarjeta}
+                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, tipoTarjeta: e.target.value as 'CREDITO' | 'DEBITO' })}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <option value="DEBITO">Débito</option>
+                    <option value="CREDITO">Crédito</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="marcaTarjeta" className="text-sm">Marca</Label>
+                  <Input
+                    id="marcaTarjeta"
+                    placeholder="Visa, Mastercard, etc."
+                    value={datosTarjeta.marcaTarjeta}
+                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: e.target.value })}
+                    className="h-10"
+                  />
+                </div>
+
+                <div className="space-y-1.5 col-span-2">
+                  <Label htmlFor="numeroCupon" className="text-sm">Número de Cupón (opcional)</Label>
+                  <Input
+                    id="numeroCupon"
+                    placeholder="0001234"
+                    value={datosTarjeta.numeroCupon}
+                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, numeroCupon: e.target.value })}
+                    className="h-10"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -837,10 +923,15 @@ export function ComprobanteTransferenciaModal({
           <Button
             type="button"
             onClick={handleConfirmar}
-            disabled={!imagenCapturada || procesando || (!esTarjeta && (!datosDetectados.monto || !datosDetectados.numeroOperacion))}
+            disabled={
+              !imagenCapturada || 
+              procesando || 
+              (esTarjeta && !datosTarjeta.numeroAutorizacion.trim()) ||
+              (!esTarjeta && (!datosDetectados.monto || !datosDetectados.numeroOperacion))
+            }
           >
             <CheckCircle className="h-4 w-4 mr-2" />
-            {esTarjeta ? 'Confirmar Comprobante' : 'Confirmar Transferencia'}
+            {esTarjeta ? 'Confirmar Pago con Tarjeta' : 'Confirmar Transferencia'}
           </Button>
         </DialogFooter>
       </DialogContent>
