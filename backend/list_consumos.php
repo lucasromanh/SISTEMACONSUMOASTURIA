@@ -60,17 +60,18 @@ try {
 
     $role = requireActiveUser($pdo, $userId);
 
-    // ✅ MODIFICADO: Agregar LEFT JOIN con wb_consumo_pagos para traer datos de transferencia
-    // También traer datos_tarjeta e imagen_comprobante de wb_consumos
+    // ✅ MODIFICADO: Agregar LEFT JOIN con wb_consumo_pagos para traer datos de transferencia y tarjeta
+    // Usar alias diferentes para evitar conflictos de nombres
     $sql = "SELECT c.*, u.username AS usuario_registro,
                    c.datos_tarjeta AS consumo_datos_tarjeta,
                    c.imagen_comprobante AS consumo_imagen_comprobante,
-                   p.imagen_comprobante,
-                   p.numero_operacion,
-                   p.banco,
-                   p.alias_cbu,
-                   p.hora AS hora_transferencia,
-                   p.datos_tarjeta AS pago_datos_tarjeta
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.imagen_comprobante END) AS pago_imagen_transferencia,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.numero_operacion END) AS pago_numero_operacion,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.banco END) AS pago_banco,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.alias_cbu END) AS pago_alias_cbu,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.hora END) AS pago_hora_transferencia,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TARJETA_CREDITO' THEN p.datos_tarjeta END) AS pago_datos_tarjeta,
+                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TARJETA_CREDITO' THEN p.imagen_comprobante END) AS pago_imagen_tarjeta
             FROM wb_consumos c
             LEFT JOIN wb_users u ON u.id = c.usuario_registro_id
             LEFT JOIN wb_consumo_pagos p ON p.consumo_id = c.id
@@ -101,7 +102,7 @@ try {
         $params[':estado'] = $estado;
     }
 
-    $sql .= " ORDER BY c.fecha DESC, c.id DESC";
+    $sql .= " GROUP BY c.id ORDER BY c.fecha DESC, c.id DESC";
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -112,35 +113,43 @@ try {
         $consumo = $row;
         
         // Si tiene datos de transferencia desde wb_consumo_pagos, crear objeto datosTransferencia
-        if (!empty($row['imagen_comprobante'])) {
+        if (!empty($row['pago_imagen_transferencia'])) {
             $consumo['datosTransferencia'] = [
-                'imagenComprobante' => $row['imagen_comprobante'],
-                'numeroOperacion' => $row['numero_operacion'],
-                'banco' => $row['banco'],
-                'aliasCbu' => $row['alias_cbu'],
-                'hora' => $row['hora_transferencia'],
+                'imagenComprobante' => $row['pago_imagen_transferencia'],
+                'numeroOperacion' => $row['pago_numero_operacion'],
+                'banco' => $row['pago_banco'],
+                'aliasCbu' => $row['pago_alias_cbu'],
+                'hora' => $row['pago_hora_transferencia'],
             ];
         }
         
-        // Si tiene datos de tarjeta desde wb_consumos o wb_consumo_pagos
-        $datosTarjetaJson = $row['consumo_datos_tarjeta'] ?: $row['pago_datos_tarjeta'];
-        if (!empty($datosTarjetaJson)) {
-            $consumo['datosTarjeta'] = json_decode($datosTarjetaJson, true);
-            // Agregar imagen del comprobante al objeto datosTarjeta si existe
+        // Si tiene datos de tarjeta desde wb_consumos
+        if (!empty($row['consumo_datos_tarjeta'])) {
+            $consumo['datosTarjeta'] = json_decode($row['consumo_datos_tarjeta'], true);
+            // Agregar imagen del comprobante desde wb_consumos si existe
             if (!empty($row['consumo_imagen_comprobante'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['consumo_imagen_comprobante'];
             }
         }
+        // Si no hay en consumos, buscar en pagos
+        elseif (!empty($row['pago_datos_tarjeta'])) {
+            $consumo['datosTarjeta'] = json_decode($row['pago_datos_tarjeta'], true);
+            // Agregar imagen del comprobante desde wb_consumo_pagos si existe
+            if (!empty($row['pago_imagen_tarjeta'])) {
+                $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
+            }
+        }
         
-        // Remover campos duplicados
-        unset($consumo['imagen_comprobante']);
-        unset($consumo['numero_operacion']);
-        unset($consumo['banco']);
-        unset($consumo['alias_cbu']);
-        unset($consumo['hora_transferencia']);
+        // Remover campos temporales
+        unset($consumo['pago_imagen_transferencia']);
+        unset($consumo['pago_numero_operacion']);
+        unset($consumo['pago_banco']);
+        unset($consumo['pago_alias_cbu']);
+        unset($consumo['pago_hora_transferencia']);
         unset($consumo['consumo_datos_tarjeta']);
         unset($consumo['consumo_imagen_comprobante']);
         unset($consumo['pago_datos_tarjeta']);
+        unset($consumo['pago_imagen_tarjeta']);
         
         return $consumo;
     }, $rows);

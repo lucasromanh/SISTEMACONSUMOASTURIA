@@ -254,8 +254,17 @@ try {
     $numOp   = trim($data['numero_operacion'] ?? '');
     $imgComp = trim($data['imagen_comprobante'] ?? '');
     
-    // ✅ NUEVO: Recibir datos de tarjeta
-    $datosTarjeta = isset($data['datos_tarjeta']) ? json_encode($data['datos_tarjeta']) : null;
+    // ✅ NUEVO: Recibir datos de tarjeta y limpiar imagenComprobante
+    $datosTarjetaRaw = $data['datos_tarjeta'] ?? null;
+    $datosTarjeta = null;
+    if ($datosTarjetaRaw) {
+        $tarjetaArray = is_array($datosTarjetaRaw) ? $datosTarjetaRaw : json_decode($datosTarjetaRaw, true);
+        if ($tarjetaArray) {
+            // Remover imagenComprobante del JSON antes de guardar
+            unset($tarjetaArray['imagenComprobante']);
+            $datosTarjeta = json_encode($tarjetaArray);
+        }
+    }
 
     requireActiveUser($pdo, $userId);
 

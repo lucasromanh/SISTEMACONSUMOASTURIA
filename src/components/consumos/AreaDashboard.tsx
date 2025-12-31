@@ -77,6 +77,8 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       metodoPago?: string;
       icono: React.ReactNode;
       datosTransferencia?: any;
+      datosTarjeta?: any;
+      imagenComprobante?: string;
     }> = [];
 
     // Priorizar movimientos como fuente de la verdad financiera
@@ -123,6 +125,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
           metodoPago: m.metodoPago || undefined,
           icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
           datosTransferencia: m.datosTransferencia,
+          datosTarjeta: (m as any).datosTarjeta,
         });
       }
 
@@ -152,6 +155,8 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
           metodoPago: c.estado === 'PAGADO' ? (c.metodoPago || 'EFECTIVO') : 'CARGAR_HABITACION',
           icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
           datosTransferencia: c.datosTransferencia,
+          datosTarjeta: c.datosTarjeta,
+          imagenComprobante: c.imagenComprobante,
         });
       }
     });
@@ -365,13 +370,13 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                             Ver comprobante
                           </button>
                         )}
-                        {transaccion.metodoPago === 'TARJETA_CREDITO' && (transaccion as any).datosTarjeta?.imagenComprobante && (
+                        {transaccion.metodoPago === 'TARJETA_CREDITO' && (((transaccion as any).datosTarjeta?.imagenComprobante) || ((transaccion as any).imagenComprobante)) && (
                           <button
                             onClick={() => {
-                              const img = (transaccion as any).datosTarjeta.imagenComprobante;
+                              const img = (transaccion as any).datosTarjeta?.imagenComprobante || (transaccion as any).imagenComprobante;
                               const w = window.open();
                               if (w) {
-                                w.document.write(`<img src="${img}" style="max-width:100%"/>`);
+                                w.document.write(`<img src="${img}" style="max-width:100%; background:#000; display:flex; justify-content:center; align-items:center; min-height:100vh;"/>`);
                               }
                             }}
                             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"

@@ -176,8 +176,19 @@ try {
     $montoPagado = isset($data['monto_pagado']) ? (float)$data['monto_pagado'] : null;
     
     // ✅ NUEVO: Recibir datos de tarjeta e imagen
-    $datosTarjeta = isset($data['datos_tarjeta']) ? json_encode($data['datos_tarjeta']) : null;
+    $datosTarjetaRaw = $data['datos_tarjeta'] ?? null;
     $imagenComprobante = trim($data['imagen_comprobante'] ?? '');
+    
+    // ✅ IMPORTANTE: Limpiar imagenComprobante de datos_tarjeta si existe
+    $datosTarjeta = null;
+    if ($datosTarjetaRaw) {
+        $tarjetaArray = is_array($datosTarjetaRaw) ? $datosTarjetaRaw : json_decode($datosTarjetaRaw, true);
+        if ($tarjetaArray) {
+            // Remover imagenComprobante del JSON antes de guardar
+            unset($tarjetaArray['imagenComprobante']);
+            $datosTarjeta = json_encode($tarjetaArray);
+        }
+    }
 
     requireActiveUser($pdo, $userId);
     requireUserArea($pdo, $userId, $area);

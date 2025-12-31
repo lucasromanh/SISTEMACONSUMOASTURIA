@@ -63,4 +63,7 @@ export interface Consumo {
   
   // Datos de tarjeta de crédito (deprecated, usar pagos[])
   datosTarjeta?: DatosTarjeta;
+  
+  // Imagen del comprobante (transferencia o tarjeta)
+  imagenComprobante?: string;
 }

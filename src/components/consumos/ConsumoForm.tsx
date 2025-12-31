@@ -293,7 +293,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
 
   // Procesar cierre de pedido (con o sin datos de transferencia/tarjeta)
-  const procesarCierrePedido = (datosComprobanteOTarjeta: any) => {
+  const procesarCierrePedido = async (datosComprobanteOTarjeta: any) => {
 
     const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
     if (!pedido) return;
@@ -391,8 +391,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     }
 
     // Función auxiliar para registrar consumos (pagados o cargados a habitación)
-    const registrarConsumos = (estadoAUsar: string, montoPagadoPorProducto?: number) => {
-      pedido.productos.forEach((producto) => {
+    const registrarConsumos = async (estadoAUsar: string, montoPagadoPorProducto?: number) => {
+      for (const producto of pedido.productos) {
         const consumoData: any = {
           fecha: fechaActual,
           area,
@@ -429,8 +429,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
             }
           }
         }
-        addConsumo(consumoData);
-      });
+        await addConsumo(consumoData);
+      }
     };
 
     // Cerrar ticket en el backend
@@ -454,8 +454,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
     // Registrar consumos si está PAGADO o si se debe cargar a habitación
     if (estadoFinal === 'PAGADO') {
-      registrarConsumos('PAGADO');
-      cerrarTicket(); // Cerrar ticket en BD
+      await registrarConsumos('PAGADO');
+      await cerrarTicket(); // Cerrar ticket en BD
       // Remover pedido y cerrar modal
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
@@ -469,8 +469,8 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       });
     } else if (estadoFinal === 'CARGAR_HABITACION') {
       // Registrar consumos con estado cargado a habitación
-      registrarConsumos('CARGAR_HABITACION');
-      cerrarTicket(); // Cerrar ticket en BD
+      await registrarConsumos('CARGAR_HABITACION');
+      await cerrarTicket(); // Cerrar ticket en BD
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
         setPedidoSeleccionado(null);

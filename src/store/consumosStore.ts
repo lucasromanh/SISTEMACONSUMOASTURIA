@@ -6,7 +6,7 @@ import { useAuthStore } from './authStore';
 
 interface ConsumosStore {
   consumos: Consumo[];
-  addConsumo: (consumo: Omit<Consumo, 'id'>) => void;
+  addConsumo: (consumo: Omit<Consumo, 'id'>) => Promise<void>;
   updateConsumo: (id: string, updates: Partial<Consumo>) => void;
   getConsumosByArea: (area: AreaConsumo) => Consumo[];
   getConsumosByDateRange: (startDate: string, endDate: string, area?: AreaConsumo) => Consumo[];
@@ -16,45 +16,101 @@ interface ConsumosStore {
 export const useConsumosStore = create<ConsumosStore>((set, get) => ({
   consumos: [],
 
-  addConsumo: (consumoData) => {
-    const newConsumo: Consumo = {
-      ...consumoData,
-      id: `consumo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    };
+  addConsumo: async (consumoData) => {
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        console.error('No hay usuario autenticado');
+        return;
+      }
 
-    set((state) => ({
-      consumos: [...state.consumos, newConsumo],
-    }));
+      // Preparar datos para el backend
+      const backendData: any = {
+        user_id: user.id,
+        fecha: consumoData.fecha,
+        area: consumoData.area,
+        habitacion_cliente: consumoData.habitacionOCliente,
+        consumo_descripcion: consumoData.consumoDescripcion,
+        categoria: consumoData.categoria,
+        precio_unitario: consumoData.precioUnitario,
+        cantidad: consumoData.cantidad,
+        estado: consumoData.estado,
+        ticket_id: consumoData.ticketId,
+        metodo_pago: consumoData.metodoPago,
+        monto_pagado: consumoData.montoPagado,
+      };
 
-    // Agregar movimiento de caja para todos los consumos
-    const { addMovimiento } = useCajasStore.getState();
-    
-    if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado) {
-      // Consumo pagado inmediatamente
-      // No registrar movimiento duplicado si ya se registró para transferencias en pagos parciales
-      const yaRegistradoTransferencia = newConsumo.pagos?.some(p => p.metodo === 'TRANSFERENCIA') ?? false;
-      if (!yaRegistradoTransferencia) {
+      // Agregar datos de tarjeta si existen
+      if (consumoData.datosTarjeta) {
+        backendData.datos_tarjeta = consumoData.datosTarjeta;
+      }
+
+      // Agregar imagen de comprobante si existe
+      if (consumoData.imagenComprobante) {
+        backendData.imagen_comprobante = consumoData.imagenComprobante;
+      }
+
+      // Agregar datos de transferencia si existen (legacy)
+      if (consumoData.datosTransferencia) {
+        backendData.hora = consumoData.datosTransferencia.hora;
+        backendData.alias_cbu = consumoData.datosTransferencia.aliasCbu;
+        backendData.banco = consumoData.datosTransferencia.banco;
+        backendData.numero_operacion = consumoData.datosTransferencia.numeroOperacion;
+        if (consumoData.datosTransferencia.imagenComprobante) {
+          backendData.imagen_comprobante = consumoData.datosTransferencia.imagenComprobante;
+        }
+      }
+
+      // Llamar al backend para crear el consumo
+      const response = await consumosService.createConsumo(backendData);
+
+      if (!response.success) {
+        console.error('Error al crear consumo en backend:', response.message);
+        return;
+      }
+
+      // Crear consumo con el ID real del backend
+      const newConsumo: Consumo = {
+        ...consumoData,
+        id: response.id.toString(),
+      };
+
+      set((state) => ({
+        consumos: [...state.consumos, newConsumo],
+      }));
+
+      // Agregar movimiento de caja para todos los consumos
+      const { addMovimiento } = useCajasStore.getState();
+      
+      if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado) {
+        // Consumo pagado inmediatamente
+        // No registrar movimiento duplicado si ya se registró para transferencias en pagos parciales
+        const yaRegistradoTransferencia = newConsumo.pagos?.some(p => p.metodo === 'TRANSFERENCIA') ?? false;
+        if (!yaRegistradoTransferencia) {
+          addMovimiento({
+            fecha: newConsumo.fecha,
+            area: newConsumo.area,
+            tipo: 'INGRESO',
+            origen: 'CONSUMO',
+            descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
+            monto: newConsumo.montoPagado,
+            metodoPago: newConsumo.metodoPago || 'EFECTIVO',
+          });
+        }
+      } else if (newConsumo.estado === 'CARGAR_HABITACION') {
+        // Consumo cargado a habitación (pendiente de cobro)
         addMovimiento({
           fecha: newConsumo.fecha,
           area: newConsumo.area,
           tipo: 'INGRESO',
           origen: 'CONSUMO',
-          descripcion: `${newConsumo.consumoDescripcion} - ${newConsumo.habitacionOCliente}`,
-          monto: newConsumo.montoPagado,
-          metodoPago: newConsumo.metodoPago || 'EFECTIVO',
+          descripcion: `${newConsumo.consumoDescripcion} - Hab. ${newConsumo.habitacionOCliente} (Pendiente)`,
+          monto: newConsumo.total,
+          metodoPago: undefined,
         });
       }
-    } else if (newConsumo.estado === 'CARGAR_HABITACION') {
-      // Consumo cargado a habitación (pendiente de cobro)
-      addMovimiento({
-        fecha: newConsumo.fecha,
-        area: newConsumo.area,
-        tipo: 'INGRESO',
-        origen: 'CONSUMO',
-        descripcion: `${newConsumo.consumoDescripcion} - Hab. ${newConsumo.habitacionOCliente} (Pendiente)`,
-        monto: newConsumo.total,
-        metodoPago: undefined,
-      });
+    } catch (error) {
+      console.error('Error al agregar consumo:', error);
     }
   },
 
@@ -122,6 +178,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
           metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
           usuarioRegistroId: c.usuario_registro_id.toString(),
           ticketId: c.ticket_id || undefined,
+          datosTarjeta: c.datos_tarjeta,
+          imagenComprobante: c.imagen_comprobante,
         }));
 
         set({ consumos: consumosFormatted });
