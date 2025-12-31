@@ -49,13 +49,28 @@ export const useAuthStore = create<AuthStore>((set) => ({
 }));
 
 // Inicializar desde localStorage si existe
-const storedUser = localStorage.getItem('user');
-if (storedUser) {
+const initializeAuth = () => {
   try {
-    const user = JSON.parse(storedUser);
-    useAuthStore.setState({ user, isAuthenticated: true });
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      // Validar que el usuario tenga los campos necesarios
+      if (user && user.id && user.username && user.role) {
+        useAuthStore.setState({ user, isAuthenticated: true });
+      } else {
+        // Datos corruptos, limpiar
+        localStorage.removeItem('user');
+      }
+    }
   } catch (e) {
     console.error('Error al cargar usuario desde localStorage', e);
+    // En caso de error, limpiar localStorage
+    localStorage.removeItem('user');
   }
+};
+
+// Inicializar al cargar la aplicación
+if (typeof window !== 'undefined') {
+  initializeAuth();
 }
 

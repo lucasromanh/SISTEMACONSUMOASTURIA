@@ -34,11 +34,34 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
+    // Limpiar estado si hay errores persistentes
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    });
     window.location.reload();
   };
 
   private handleGoHome = () => {
+    // Limpiar estado antes de navegar
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    });
     window.location.href = '/';
+  };
+
+  private handleClearAndReload = () => {
+    // Limpiar todo el localStorage y recargar
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (e) {
+      console.error('Error al limpiar storage:', e);
+    }
+    window.location.href = '/login';
   };
 
   public render() {
@@ -79,13 +102,23 @@ export class ErrorBoundary extends Component<Props, State> {
                 </details>
               )}
 
-              <div className="flex gap-3 pt-4">
-                <Button onClick={this.handleReload} className="flex-1">
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Recargar página
-                </Button>
-                <Button onClick={this.handleGoHome} variant="outline" className="flex-1">
-                  Ir al inicio
+              <div className="flex flex-col gap-3 pt-4">
+                <div className="flex gap-3">
+                  <Button onClick={this.handleReload} className="flex-1">
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Recargar página
+                  </Button>
+                  <Button onClick={this.handleGoHome} variant="outline" className="flex-1">
+                    Ir al inicio
+                  </Button>
+                </div>
+                <Button 
+                  onClick={this.handleClearAndReload} 
+                  variant="destructive" 
+                  size="sm"
+                  className="w-full"
+                >
+                  Limpiar datos y reiniciar (si el problema persiste)
                 </Button>
               </div>
             </CardContent>
