@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAuthStore, getDefaultRouteForRole } from '@/store/authStore';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
@@ -13,6 +14,7 @@ import { StockPage } from '@/pages/dashboard/stock/StockPage';
 import { GastosPage } from '@/pages/dashboard/stock/GastosPage';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
 import { AdminProductsPage } from '@/pages/admin/AdminProductsPage';
+import { Loader2 } from 'lucide-react';
 import type { UserRole } from '@/types/auth';
 
 interface ProtectedRouteProps {
@@ -23,6 +25,7 @@ interface ProtectedRouteProps {
 function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore();
 
+  // Dar tiempo para que se inicialice el store desde localStorage
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
@@ -40,16 +43,38 @@ function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
 function DefaultRedirect() {
   const { isAuthenticated, user } = useAuthStore();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  const defaultRoute = user ? getDefaultRouteForRole(user.role) : '/dashboard/winnebar';
+  const defaultRoute = getDefaultRouteForRole(user.role);
   return <Navigate to={defaultRoute} replace />;
 }
 
 export function AppRouter() {
   const { isAuthenticated } = useAuthStore();
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // Dar tiempo para que se inicialice el store desde localStorage
+  useEffect(() => {
+    // Pequeño delay para asegurar que el store se inicialice
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-hotel-wine-600" />
+          <p className="text-sm text-muted-foreground">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
