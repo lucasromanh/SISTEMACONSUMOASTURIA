@@ -245,6 +245,25 @@ try {
 
         $consumoId = (int)$pdo->lastInsertId();
 
+        // ✅ NUEVO: Si el consumo es PAGADO, crear registro en wb_consumo_pagos
+        if ($estado === 'PAGADO' && $metodoPago && $montoPagado > 0) {
+            $stmtPago = $pdo->prepare("
+                INSERT INTO wb_consumo_pagos
+                (consumo_id, fecha, metodo, monto, usuario_registro_id, datos_tarjeta, imagen_comprobante)
+                VALUES
+                (:consumo_id, :fecha, :metodo, :monto, :uid, :datos_tarjeta, :imagen_comprobante)
+            ");
+            $stmtPago->execute([
+                ':consumo_id' => $consumoId,
+                ':fecha' => $fecha,
+                ':metodo' => $metodoPago,
+                ':monto' => $montoPagado,
+                ':uid' => $userId,
+                ':datos_tarjeta' => $datosTarjeta,
+                ':imagen_comprobante' => $imagenComprobante ?: null,
+            ]);
+        }
+
         // Reducir stock si la categoría lo requiere
         $stockInfo = ['stock_reducido' => false];
         if (shouldReduceStock($categoria)) {

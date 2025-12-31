@@ -55,7 +55,7 @@ interface PedidoActivo {
 }
 
 export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
-  const { addConsumo } = useConsumosStore();
+  const { addConsumo, loadConsumos } = useConsumosStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
   // Helper: parsear montos que vienen de OCR / inputs en formatos locales
@@ -456,6 +456,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     if (estadoFinal === 'PAGADO') {
       await registrarConsumos('PAGADO');
       await cerrarTicket(); // Cerrar ticket en BD
+      // ✅ Recargar consumos del día para actualizar la vista
+      const fechaISO = getTodayISO();
+      await loadConsumos(area, fechaISO, fechaISO);
       // Remover pedido y cerrar modal
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
@@ -471,6 +474,9 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       // Registrar consumos con estado cargado a habitación
       await registrarConsumos('CARGAR_HABITACION');
       await cerrarTicket(); // Cerrar ticket en BD
+      // ✅ Recargar consumos del día para actualizar la vista
+      const fechaISO = getTodayISO();
+      await loadConsumos(area, fechaISO, fechaISO);
       setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
       if (pedidoSeleccionado === pedidoACerrar) {
         setPedidoSeleccionado(null);

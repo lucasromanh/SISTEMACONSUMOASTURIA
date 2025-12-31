@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
@@ -21,9 +21,16 @@ interface AreaDashboardProps {
 
 export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashboardProps) {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
-  const { consumos: allConsumos } = useConsumosStore();
-  const { movimientos: allMovimientos } = useCajasStore();
+  const { consumos: allConsumos, loadConsumos } = useConsumosStore();
+  const { movimientos: allMovimientos, loadMovimientos } = useCajasStore();
   const { getGastosByDateRange } = useStockStore();
+
+  // ✅ Cargar consumos y movimientos cuando cambia la fecha o el área
+  useEffect(() => {
+    const fechaISO = format(fechaSeleccionada, 'yyyy-MM-dd');
+    loadConsumos(area, fechaISO, fechaISO);
+    loadMovimientos(area, fechaISO, fechaISO);
+  }, [fechaSeleccionada, area, loadConsumos, loadMovimientos]);
 
   // ✅ Validar que productosPorCategoria es un objeto válido
   const hayProductosDisponibles = productosPorCategoria && 
