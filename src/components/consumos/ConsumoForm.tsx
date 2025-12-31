@@ -117,7 +117,14 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   const [mostrarConfirmCancelar, setMostrarConfirmCancelar] = useState(false);
   const [pedidoACancelar, setPedidoACancelar] = useState<string | null>(null);
 
-  const productosDisponibles = categoria ? productosPorCategoria[categoria] || [] : [];
+  // ✅ Validación defensiva: asegurar que productosPorCategoria es un objeto válido
+  const categoriasDisponibles = productosPorCategoria && typeof productosPorCategoria === 'object' 
+    ? Object.keys(productosPorCategoria).filter(cat => productosPorCategoria[cat]?.length > 0)
+    : [];
+  
+  const productosDisponibles = categoria && productosPorCategoria && productosPorCategoria[categoria] 
+    ? productosPorCategoria[categoria] 
+    : [];
 
   // Obtener pedido activo actual
   const pedidoActual = pedidosActivos.find(p => p.id === pedidoSeleccionado);
@@ -642,11 +649,17 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                       <SelectValue placeholder="Seleccione categoría" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.keys(productosPorCategoria).map((cat) => (
-                        <SelectItem key={cat} value={cat} className="text-base">
-                          {cat}
+                      {categoriasDisponibles.length > 0 ? (
+                        categoriasDisponibles.map((cat) => (
+                          <SelectItem key={cat} value={cat} className="text-base">
+                            {cat}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="_empty" disabled className="text-base text-muted-foreground">
+                          No hay productos disponibles
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
