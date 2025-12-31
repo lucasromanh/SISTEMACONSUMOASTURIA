@@ -476,6 +476,14 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         metodoReal = metodoPago || 'EFECTIVO';
       }
 
+      console.log('🎫 Cerrando ticket:', {
+        ticketId: pedido.ticketId,
+        metodoReal,
+        totalEfectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
+        totalTransferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
+        totalTarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
+      });
+
       try {
         await ticketsService.closeTicket({
           user_id: user.id,

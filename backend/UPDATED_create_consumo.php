@@ -209,6 +209,11 @@ try {
         }
     }
 
+    // 🐛 DEBUG: Log para verificar qué se va a guardar
+    error_log("CREATE_CONSUMO DEBUG: metodoPago = " . var_export($metodoPago, true));
+    error_log("CREATE_CONSUMO DEBUG: datosTarjeta = " . var_export($datosTarjeta, true));
+    error_log("CREATE_CONSUMO DEBUG: imagenComprobante length = " . strlen($imagenComprobante));
+
     $total = $precio * $cantidad;
 
     $pdo->beginTransaction();
