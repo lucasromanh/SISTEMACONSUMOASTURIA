@@ -36,7 +36,8 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         cantidad: consumoData.cantidad,
         estado: consumoData.estado,
         ticket_id: consumoData.ticketId,
-        metodo_pago: consumoData.metodoPago,
+        // ✅ Solo enviar metodo_pago si tiene un valor válido
+        metodo_pago: consumoData.metodoPago || null,
         monto_pagado: consumoData.montoPagado,
       };
 

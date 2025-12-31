@@ -391,12 +391,12 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     }
 
     // Función auxiliar para registrar consumos (pagados o cargados a habitación)
-    const registrarConsumos = async (estadoAUsar: string, montoPagadoPorProducto?: number) => {
+    const registrarConsumos = async (estadoAUsar: string, pagosParam: PagoRegistrado[], montoPagadoPorProducto?: number) => {
       for (const producto of pedido.productos) {
         // ✅ Determinar método de pago desde el array de pagos (fuente de verdad)
-        let metodoFinal: MetodoPago = undefined as any;
-        const pagosTarjeta = pagos.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
-        const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
+        let metodoFinal: MetodoPago | undefined = undefined;
+        const pagosTarjeta = pagosParam.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
+        const pagosTransfer = pagosParam.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
         
         if (estadoAUsar === 'PAGADO') {
           if (pagosTarjeta.length > 0) {
@@ -404,9 +404,18 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           } else if (pagosTransfer.length > 0) {
             metodoFinal = 'TRANSFERENCIA';
           } else {
-            // Si no hay pagos en el array, usar el método del estado
+            // Si no hay pagos en el array, usar el método del estado o EFECTIVO por defecto
             metodoFinal = metodoPago || 'EFECTIVO';
           }
+          
+          // 🐛 DEBUG: Verificar método de pago determinado
+          console.log('📋 Método de pago determinado:', {
+            metodoFinal,
+            pagosTarjeta: pagosTarjeta.length,
+            pagosTransfer: pagosTransfer.length,
+            metodoPagoState: metodoPago,
+            totalPagos: pagosParam.length
+          });
         }
         
         const consumoData: any = {
@@ -423,11 +432,11 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           metodoPago: metodoFinal,
           usuarioRegistroId: user?.id ? String(user.id) : '',
           ticketId: pedido.ticketId, // Vincular consumo con ticket
-          pagos: pagos,
+          pagos: pagosParam,
         };
         // Si hubo pagos con transferencia o tarjeta, pasar los datos
-        if (pagos && pagos.length > 0) {
-          const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
+        if (pagosParam && pagosParam.length > 0) {
+          const pagosTransfer = pagosParam.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
           if (pagosTransfer.length > 0) {
             const datosTransfer = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
             consumoData.datosTransferencia = datosTransfer;
@@ -502,7 +511,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
     // Registrar consumos si está PAGADO o si se debe cargar a habitación
     if (estadoFinal === 'PAGADO') {
-      await registrarConsumos('PAGADO');
+      await registrarConsumos('PAGADO', pagos);
       await cerrarTicket(); // Cerrar ticket en BD
       // ✅ Recargar consumos del día para actualizar la vista
       const fechaISO = getTodayISO();
@@ -520,7 +529,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
       });
     } else if (estadoFinal === 'CARGAR_HABITACION') {
       // Registrar consumos con estado cargado a habitación
-      await registrarConsumos('CARGAR_HABITACION');
+      await registrarConsumos('CARGAR_HABITACION', []);
       await cerrarTicket(); // Cerrar ticket en BD
       // ✅ Recargar consumos del día para actualizar la vista
       const fechaISO = getTodayISO();
