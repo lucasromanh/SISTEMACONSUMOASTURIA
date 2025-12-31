@@ -12,6 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once 'db.php';
 
+// 🔍 DEBUG: Archivo de log
+$debugFile = __DIR__ . '/debug_list_consumos.txt';
+
 // Helper
 function getRequestData() {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
@@ -58,11 +61,20 @@ try {
     $to     = trim($data['to']   ?? '');
     $estado = trim($data['estado'] ?? '');
 
+    // 🔍 DEBUG: Log de parámetros recibidos
+    $debugMsg = "\n" . date('Y-m-d H:i:s') . " - LIST_CONSUMOS CALLED\n";
+    $debugMsg .= "Parámetros: user_id={$userId}, area={$area}, from={$from}, to={$to}, estado={$estado}\n";
+    file_put_contents($debugFile, $debugMsg, FILE_APPEND);
+
     $role = requireActiveUser($pdo, $userId);
 
     // ✅ MODIFICADO: Agregar LEFT JOIN con wb_consumo_pagos para traer datos de transferencia y tarjeta
     // Usar alias diferentes para evitar conflictos de nombres
-    $sql = "SELECT c.*, u.username AS usuario_registro,
+    $sql = "SELECT c.id, c.fecha, c.area, c.habitacion_cliente, c.consumo_descripcion, 
+                   c.categoria, c.precio_unitario, c.cantidad, c.total, c.estado,
+                   c.monto_pagado, c.metodo_pago, c.usuario_registro_id, c.ticket_id,
+                   c.datos_tarjeta, c.imagen_comprobante, c.created_at,
+                   u.username AS usuario_registro,
                    c.datos_tarjeta AS consumo_datos_tarjeta,
                    c.imagen_comprobante AS consumo_imagen_comprobante,
                    GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.imagen_comprobante END) AS pago_imagen_transferencia,
@@ -104,13 +116,29 @@ try {
 
     $sql .= " GROUP BY c.id ORDER BY c.fecha DESC, c.id DESC";
 
+    // 🔍 DEBUG: Log del SQL ejecutado
+    $debugMsg = date('Y-m-d H:i:s') . " - SQL ejecutado con " . count($params) . " parámetros\n";
+    file_put_contents($debugFile, $debugMsg, FILE_APPEND);
+
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // 🔍 DEBUG: Log de resultados obtenidos
+    $debugMsg = date('Y-m-d H:i:s') . " - Filas obtenidas: " . count($rows) . "\n";
+    file_put_contents($debugFile, $debugMsg, FILE_APPEND);
+
     // ✅ NUEVO: Formatear datos de transferencia y tarjeta como objetos JSON
     $consumos = array_map(function($row) {
         $consumo = $row;
+        
+        // 🔍 DEBUG: Log del metodo_pago que viene de la BD
+        $metodoPagoValue = $row['metodo_pago'] ?? 'NO EXISTE';
+        error_log("📖 LIST_CONSUMOS - ID: " . $row['id'] . ", metodo_pago DB: " . var_export($metodoPagoValue, true));
+        
+        global $debugFile;
+        $debugMsg = date('Y-m-d H:i:s') . " - ID: {$row['id']}, metodo_pago: " . var_export($metodoPagoValue, true) . ", estado: {$row['estado']}\n";
+        file_put_contents($debugFile, $debugMsg, FILE_APPEND);
         
         // Si tiene datos de transferencia desde wb_consumo_pagos, crear objeto datosTransferencia
         if (!empty($row['pago_imagen_transferencia'])) {
@@ -153,6 +181,15 @@ try {
         
         return $consumo;
     }, $rows);
+
+    // 🔍 DEBUG: Log de consumos enviados al frontend
+    $debugMsg = date('Y-m-d H:i:s') . " - Enviando " . count($consumos) . " consumos al frontend\n";
+    $debugMsg .= "Primeros 3 IDs y métodos: ";
+    foreach (array_slice($consumos, 0, 3) as $c) {
+        $debugMsg .= "[ID:{$c['id']}, metodo:{$c['metodo_pago']}] ";
+    }
+    $debugMsg .= "\n";
+    file_put_contents($debugFile, $debugMsg, FILE_APPEND);
 
     echo json_encode([
         'success'  => true,

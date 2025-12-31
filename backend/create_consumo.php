@@ -1,5 +1,5 @@
 <?php
-// create_consumo.php
+// create_consumo.php - ACTUALIZADO PARA TARJETA DE CRÉDITO
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -47,7 +47,6 @@ function shouldReduceStock(string $categoria): bool {
         'Entradas'
     ];
     
-    // Comparación case-insensitive
     foreach ($categoriasExcluidas as $excluida) {
         if (strcasecmp($categoria, $excluida) === 0) {
             return false;
@@ -59,7 +58,6 @@ function shouldReduceStock(string $categoria): bool {
 
 // ✅ Reducir stock automáticamente con búsqueda en cascada
 function reducirStock(PDO $pdo, string $area, string $productoNombre, float $cantidad, int $userId, int $consumoId) {
-    // 1️⃣ Buscar primero en el área específica
     $stmt = $pdo->prepare("
         SELECT id, stock_actual, stock_minimo, nombre, categoria, area
         FROM wb_stock_items
@@ -73,7 +71,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     
     $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // 2️⃣ Si no se encuentra, buscar en área GENERAL como fallback
     if (!$stockItem) {
         $stmt->execute([
             ':area' => 'GENERAL',
@@ -82,7 +79,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     
-    // 3️⃣ Si aún no existe en stock, no hacer nada (producto sin inventario)
     if (!$stockItem) {
         return [
             'stock_reducido' => false,
@@ -95,15 +91,12 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     $stockItemId = (int)$stockItem['id'];
     $areaEncontrada = $stockItem['area'];
     
-    // Verificar si hay stock disponible
     if ($stockActual <= 0) {
         throw new Exception("⚠️ Stock agotado para '{$productoNombre}'. No se puede vender.");
     }
     
-    // Calcular nuevo stock
     $nuevoStock = $stockActual - $cantidad;
     
-    // Actualizar stock
     $stmtUpdate = $pdo->prepare("
         UPDATE wb_stock_items
         SET stock_actual = :nuevo_stock,
@@ -115,7 +108,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':id' => $stockItemId
     ]);
     
-    // Registrar movimiento en historial
     $stmtMov = $pdo->prepare("
         INSERT INTO wb_stock_movimientos
         (stock_item_id, tipo, cantidad, stock_anterior, stock_nuevo, motivo, consumo_id, user_id)
@@ -132,7 +124,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':user_id' => $userId
     ]);
     
-    // Verificar si llegó al stock mínimo
     $alerta = '';
     if ($nuevoStock <= $stockMinimo && $nuevoStock > 0) {
         $alerta = "⚠️ ALERTA: Stock de '{$productoNombre}' llegó al mínimo ({$nuevoStock} unidades). Reponer pronto.";
@@ -171,7 +162,7 @@ try {
     $data = getRequestData();
 
     $userId   = (int)($data['user_id'] ?? 0);
-    $fecha    = trim($data['fecha'] ?? ''); // ISO (YYYY-MM-DD HH:MM:SS)
+    $fecha    = trim($data['fecha'] ?? '');
     $area     = trim($data['area']  ?? '');
     $habCli   = trim($data['habitacion_cliente'] ?? '');
     $desc     = trim($data['consumo_descripcion'] ?? '');
@@ -181,8 +172,35 @@ try {
     $estado   = trim($data['estado'] ?? 'CARGAR_HABITACION');
     $ticketId = isset($data['ticket_id']) ? (int)$data['ticket_id'] : null;
     
+    // 🐛 DEBUG CRÍTICO: Ver qué llega en metodo_pago ANTES de procesar
+    error_log("🔍 CREATE_CONSUMO - RAW DATA metodo_pago: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true));
+    error_log("🔍 CREATE_CONSUMO - RAW DATA completo: " . json_encode($data));
+    
+    // 🔍 ESCRIBIR DEBUG A ARCHIVO
+    $debugFile = __DIR__ . '/debug_create_consumo.txt';
+    file_put_contents($debugFile, 
+        date('Y-m-d H:i:s') . " - metodo_pago recibido: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n" .
+        "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n\n",
+        FILE_APPEND
+    );
+    
     $metodoPago = trim($data['metodo_pago'] ?? '');
     $montoPagado = isset($data['monto_pagado']) ? (float)$data['monto_pagado'] : null;
+    
+    // ✅ NUEVO: Recibir datos de tarjeta e imagen
+    $datosTarjetaRaw = $data['datos_tarjeta'] ?? null;
+    $imagenComprobante = trim($data['imagen_comprobante'] ?? '');
+    
+    // ✅ IMPORTANTE: Limpiar imagenComprobante de datos_tarjeta si existe
+    $datosTarjeta = null;
+    if ($datosTarjetaRaw) {
+        $tarjetaArray = is_array($datosTarjetaRaw) ? $datosTarjetaRaw : json_decode($datosTarjetaRaw, true);
+        if ($tarjetaArray) {
+            // Remover imagenComprobante del JSON antes de guardar
+            unset($tarjetaArray['imagenComprobante']);
+            $datosTarjeta = json_encode($tarjetaArray);
+        }
+    }
 
     requireActiveUser($pdo, $userId);
     requireUserArea($pdo, $userId, $area);
@@ -192,20 +210,37 @@ try {
         throw new Exception("Datos incompletos o inválidos para el consumo");
     }
 
+    // ✅ NUEVO: Validar que TARJETA_CREDITO tenga datos obligatorios
+    if ($metodoPago === 'TARJETA_CREDITO') {
+        $tarjetaData = json_decode($datosTarjeta, true);
+        if (!$tarjetaData || empty($tarjetaData['numeroAutorizacion'])) {
+            throw new Exception("Número de autorización es obligatorio para pagos con tarjeta");
+        }
+        if (empty($tarjetaData['tipoTarjeta']) || empty($tarjetaData['marcaTarjeta'])) {
+            throw new Exception("Tipo y marca de tarjeta son obligatorios");
+        }
+    }
+
+    // 🐛 DEBUG: Log para verificar qué se va a guardar
+    error_log("CREATE_CONSUMO DEBUG: metodoPago = " . var_export($metodoPago, true));
+    error_log("CREATE_CONSUMO DEBUG: datosTarjeta = " . var_export($datosTarjeta, true));
+    error_log("CREATE_CONSUMO DEBUG: imagenComprobante length = " . strlen($imagenComprobante));
+
     $total = $precio * $cantidad;
 
-    // Iniciar transacción para asegurar consistencia
     $pdo->beginTransaction();
 
     try {
-        // Insertar consumo
+        // ✅ ACTUALIZADO: Insertar consumo con datos_tarjeta e imagen_comprobante
         $stmt = $pdo->prepare("
             INSERT INTO wb_consumos
             (fecha, area, habitacion_cliente, consumo_descripcion, categoria,
-             precio_unitario, cantidad, total, estado, metodo_pago, monto_pagado, usuario_registro_id, ticket_id)
+             precio_unitario, cantidad, total, estado, metodo_pago, monto_pagado, 
+             datos_tarjeta, imagen_comprobante, usuario_registro_id, ticket_id)
             VALUES
             (:fecha, :area, :hab, :desc, :cat,
-             :precio, :cant, :total, :estado, :metodo_pago, :monto_pagado, :uid, :ticket_id)
+             :precio, :cant, :total, :estado, :metodo_pago, :monto_pagado,
+             :datos_tarjeta, :imagen_comprobante, :uid, :ticket_id)
         ");
         $stmt->execute([
             ':fecha'       => $fecha,
@@ -219,13 +254,51 @@ try {
             ':estado'      => $estado,
             ':metodo_pago' => $metodoPago ?: null,
             ':monto_pagado'=> $montoPagado,
+            ':datos_tarjeta' => $datosTarjeta,
+            ':imagen_comprobante' => $imagenComprobante ?: null,
             ':uid'         => $userId,
             ':ticket_id'   => $ticketId ?: null,
         ]);
-
+        
         $consumoId = (int)$pdo->lastInsertId();
+        
+        // 🐛 DEBUG CRÍTICO: Verificar qué se insertó REALMENTE en la BD
+        $stmtVerify = $pdo->prepare("SELECT metodo_pago FROM wb_consumos WHERE id = :id");
+        $stmtVerify->execute([':id' => $consumoId]);
+        $verificacion = $stmtVerify->fetch(PDO::FETCH_ASSOC);
+        
+        error_log("✅ CREATE_CONSUMO - INSERT ejecutado. ID: {$consumoId}");
+        error_log("✅ Variable \$metodoPago antes de INSERT: " . var_export($metodoPago, true));
+        error_log("✅ Valor enviado al PDO: " . var_export($metodoPago ?: null, true));
+        error_log("✅ Valor EN LA BD después de INSERT: " . var_export($verificacion['metodo_pago'] ?? 'NULL', true));
+        
+        file_put_contents($debugFile, 
+            date('Y-m-d H:i:s') . " - metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
+            "estado: {$estado}, montoPagado: {$montoPagado}\n" .
+            "Verificación BD: " . var_export($verificacion['metodo_pago'] ?? 'NULL', true) . "\n\n",
+            FILE_APPEND
+        );
 
-        // ✅ Reducir stock si la categoría lo requiere (para TODOS los estados)
+        // ✅ NUEVO: Si el consumo es PAGADO, crear registro en wb_consumo_pagos
+        if ($estado === 'PAGADO' && $metodoPago && $montoPagado > 0) {
+            $stmtPago = $pdo->prepare("
+                INSERT INTO wb_consumo_pagos
+                (consumo_id, fecha, metodo, monto, usuario_registro_id, datos_tarjeta, imagen_comprobante)
+                VALUES
+                (:consumo_id, :fecha, :metodo, :monto, :uid, :datos_tarjeta, :imagen_comprobante)
+            ");
+            $stmtPago->execute([
+                ':consumo_id' => $consumoId,
+                ':fecha' => $fecha,
+                ':metodo' => $metodoPago,
+                ':monto' => $montoPagado,
+                ':uid' => $userId,
+                ':datos_tarjeta' => $datosTarjeta,
+                ':imagen_comprobante' => $imagenComprobante ?: null,
+            ]);
+        }
+
+        // Reducir stock si la categoría lo requiere
         $stockInfo = ['stock_reducido' => false];
         if (shouldReduceStock($categoria)) {
             $stockInfo = reducirStock($pdo, $area, $desc, $cantidad, $userId, $consumoId);
@@ -233,7 +306,6 @@ try {
 
         $pdo->commit();
 
-        // Respuesta con información de stock
         $response = [
             'success' => true,
             'id'      => $consumoId,
@@ -241,7 +313,6 @@ try {
             'stock_info' => $stockInfo
         ];
 
-        // Agregar alerta si existe
         if (!empty($stockInfo['alerta'])) {
             $response['alerta_stock'] = $stockInfo['alerta'];
         }

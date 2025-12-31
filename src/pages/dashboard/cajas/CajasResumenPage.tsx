@@ -65,13 +65,18 @@ export function CajasResumenPage() {
       .filter((m) => m.metodoPago === 'TRANSFERENCIA' && m.origen !== 'INICIAL')
       .reduce((sum, m) => sum + m.monto, 0);
 
+    const totalIngresosTarjeta = ingresos
+      .filter((m) => m.metodoPago === 'TARJETA_CREDITO' && m.origen !== 'INICIAL')
+      .reduce((sum, m) => sum + m.monto, 0);
+
     const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
 
     return {
       totalIngresosEfectivo,
       totalIngresosTransferencia,
+      totalIngresosTarjeta,
       totalEgresos,
-      totalNeto: totalIngresosEfectivo + totalIngresosTransferencia - totalEgresos,
+      totalNeto: totalIngresosEfectivo + totalIngresosTransferencia + totalIngresosTarjeta - totalEgresos,
     };
   }, [movimientos]);
 

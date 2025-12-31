@@ -55,6 +55,7 @@ export function ComprobanteTransferenciaModal({
     marcaTarjeta: '',
     numeroCupon: '',
   });
+  const [marcaTarjetaOtra, setMarcaTarjetaOtra] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -629,6 +630,7 @@ export function ComprobanteTransferenciaModal({
       marcaTarjeta: '',
       numeroCupon: '',
     });
+    setMarcaTarjetaOtra(false);
     onOpenChange(false);
   };
 
@@ -892,13 +894,62 @@ export function ComprobanteTransferenciaModal({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="marcaTarjeta" className="text-sm">Marca</Label>
-                  <Input
-                    id="marcaTarjeta"
-                    placeholder="Visa, Mastercard, etc."
-                    value={datosTarjeta.marcaTarjeta}
-                    onChange={(e) => setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: e.target.value })}
-                    className="h-10"
-                  />
+                  {!marcaTarjetaOtra ? (
+                    <select
+                      id="marcaTarjeta"
+                      value={datosTarjeta.marcaTarjeta}
+                      onChange={(e) => {
+                        if (e.target.value === 'OTRA') {
+                          setMarcaTarjetaOtra(true);
+                          setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: '' });
+                        } else {
+                          setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: e.target.value });
+                        }
+                      }}
+                      className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Seleccionar...</option>
+                      <optgroup label="Tarjetas tradicionales">
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="American Express">American Express</option>
+                        <option value="Cabal">Cabal</option>
+                        <option value="Naranja">Naranja</option>
+                        <option value="Nativa">Nativa</option>
+                      </optgroup>
+                      <optgroup label="Tarjetas virtuales">
+                        <option value="Mercado Pago">Mercado Pago</option>
+                        <option value="Ualá">Ualá</option>
+                        <option value="Prex">Prex</option>
+                        <option value="Astropay">Astropay</option>
+                        <option value="Lemon">Lemon</option>
+                        <option value="Personal Pay">Personal Pay</option>
+                      </optgroup>
+                      <option value="OTRA">Otra...</option>
+                    </select>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        id="marcaTarjeta"
+                        placeholder="Escribir marca..."
+                        value={datosTarjeta.marcaTarjeta}
+                        onChange={(e) => setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: e.target.value })}
+                        className="h-10 flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setMarcaTarjetaOtra(false);
+                          setDatosTarjeta({ ...datosTarjeta, marcaTarjeta: '' });
+                        }}
+                        className="h-10 px-3"
+                        title="Volver al selector"
+                      >
+                        ←
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 col-span-2">

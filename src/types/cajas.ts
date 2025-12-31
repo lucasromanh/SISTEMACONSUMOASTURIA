@@ -39,6 +39,7 @@ export interface DatosParaCajaHotel {
 export interface ResumenCaja {
   totalIngresosEfectivo: number;
   totalIngresosTransferencia: number;
+  totalIngresosTarjeta: number; // ✅ Agregado para tarjetas de crédito/débito
   totalEgresos: number;
   totalNeto: number;
 }

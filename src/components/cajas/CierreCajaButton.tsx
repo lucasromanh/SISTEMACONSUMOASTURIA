@@ -81,12 +81,16 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
     .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TRANSFERENCIA')
     .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
 
-  // 3. Egresos: Sumar movimientos de egreso
+  // 3. Tarjetas: Sumar Consumos pagados con TARJETA_CREDITO
+  const consumosTarjeta = consumos.filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO');
+  const totalTarjeta = consumosTarjeta.reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
+
+  // 4. Egresos: Sumar movimientos de egreso
   const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
 
-  const totalNeto = totalEfectivo + totalTransferencia - totalEgresos;
+  const totalNeto = totalEfectivo + totalTransferencia + totalTarjeta - totalEgresos;
 
-  // 4. Cargas a Habitación: Obtener de consumos con estado 'CARGAR_HABITACION'
+  // 5. Cargas a Habitación: Obtener de consumos con estado 'CARGAR_HABITACION'
   const cargasHabitacion = consumos
     .filter((c) => c.estado === 'CARGAR_HABITACION')
     .reduce((acc, curr) => {
@@ -143,8 +147,18 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
         `👤 Usuario: ${user?.displayName || 'Sistema'}\n\n` +
         `💵 *Efectivo:* ${formatCurrency(totalEfectivo)}\n` +
         `🏦 *Transferencia:* ${formatCurrency(totalTransferencia)}\n` +
+        `💳 *Tarjeta:* ${formatCurrency(totalTarjeta)}\n` +
         (totalEgresos > 0 ? `📤 *Egresos:* ${formatCurrency(totalEgresos)}\n` : '') +
         `💰 *TOTAL NETO:* ${formatCurrency(totalNeto)}\n` +
+        (consumosTarjeta.length > 0 ?
+          `\n💳 *Detalle Tarjetas (${consumosTarjeta.length}):*\n` +
+          consumosTarjeta.map(c => {
+            const datos = c.datosTarjeta;
+            return `  • ${formatCurrency(c.montoPagado || c.total)} - ${datos?.marcaTarjeta || 'N/A'} ${datos?.tipoTarjeta || ''}\n` +
+                   `    Aut: ${datos?.numeroAutorizacion || 'N/A'} | Cupón: ${datos?.numeroCupon || 'N/A'}`;
+          }).join('\n')
+          : ''
+        ) +
         (cargasHabitacion.length > 0 ?
           `\n🏨 *Cargas a Habitación:* ${formatCurrency(totalCargasHabitacion)}\n` +
           cargasHabitacion.map(c => `  • Hab. ${c.habitacion}: ${formatCurrency(c.total)}`).join('\n')
@@ -290,6 +304,11 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
                 <span className="font-bold text-blue-700 text-lg">{formatCurrency(totalTransferencia)}</span>
               </div>
 
+              <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                <span className="text-gray-700">💳 Tarjeta:</span>
+                <span className="font-bold text-purple-700 text-lg">{formatCurrency(totalTarjeta)}</span>
+              </div>
+
               {totalEgresos > 0 && (
                 <div className="flex justify-between items-center py-2 border-b border-gray-200">
                   <span className="text-gray-700">📤 Egresos:</span>
@@ -302,6 +321,50 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
                 <span className="font-bold text-2xl text-green-800">{formatCurrency(totalNeto)}</span>
               </div>
             </div>
+
+            {/* Detalle de Tarjetas */}
+            {consumosTarjeta.length > 0 && (
+              <div className="space-y-3 border-t-2 border-gray-300 pt-4">
+                <h3 className="text-lg font-bold text-gray-800 border-b border-gray-300 pb-1">
+                  💳 Detalle de Pagos con Tarjeta ({consumosTarjeta.length})
+                </h3>
+
+                <div className="space-y-2">
+                  {consumosTarjeta.map((consumo, idx) => {
+                    const datos = consumo.datosTarjeta;
+                    return (
+                      <div
+                        key={consumo.id || idx}
+                        className="py-2 px-3 bg-purple-50 rounded border border-purple-200 space-y-1"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-semibold text-gray-800">
+                            {datos?.marcaTarjeta || 'N/A'} - {datos?.tipoTarjeta || 'N/A'}
+                          </span>
+                          <span className="font-bold text-purple-800 text-lg">
+                            {formatCurrency(consumo.montoPagado || consumo.total)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-600 space-y-0.5">
+                          <div>🔢 Aut: <span className="font-mono">{datos?.numeroAutorizacion || 'N/A'}</span></div>
+                          <div>🎫 Cupón: <span className="font-mono">{datos?.numeroCupon || 'N/A'}</span></div>
+                          {datos?.cuotas && datos.cuotas > 1 && (
+                            <div>📊 Cuotas: {datos.cuotas}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between items-center py-2 border-t-2 border-purple-600 mt-2 bg-purple-100 px-3 rounded">
+                  <span className="text-sm font-bold text-gray-900">Subtotal Tarjetas:</span>
+                  <span className="font-bold text-lg text-purple-800">
+                    {formatCurrency(totalTarjeta)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Cargas a Habitación */}
             {cargasHabitacion.length > 0 && (

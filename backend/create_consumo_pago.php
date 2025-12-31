@@ -1,5 +1,5 @@
 <?php
-// create_consumo_pago.php
+// create_consumo_pago.php - ACTUALIZADO PARA TARJETA DE CRÉDITO
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
@@ -35,7 +35,7 @@ function requireActiveUser(PDO $pdo, int $userId) {
     }
 }
 
-// ✅ NUEVO: Verificar si la categoría NO debe reducir stock
+// ✅ Verificar si la categoría NO debe reducir stock
 function shouldReduceStock(string $categoria): bool {
     $categoriasExcluidas = [
         'Menu',
@@ -47,7 +47,6 @@ function shouldReduceStock(string $categoria): bool {
         'Entradas'
     ];
     
-    // Comparación case-insensitive
     foreach ($categoriasExcluidas as $excluida) {
         if (strcasecmp($categoria, $excluida) === 0) {
             return false;
@@ -57,9 +56,8 @@ function shouldReduceStock(string $categoria): bool {
     return true;
 }
 
-// ✅ MODIFICADO: Reducir stock automáticamente con búsqueda en cascada
+// ✅ Reducir stock automáticamente con búsqueda en cascada
 function reducirStock(PDO $pdo, string $area, string $productoNombre, float $cantidad, int $userId, int $consumoId) {
-    // 1️⃣ Buscar primero en el área específica
     $stmt = $pdo->prepare("
         SELECT id, stock_actual, stock_minimo, nombre, categoria, area
         FROM wb_stock_items
@@ -73,7 +71,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     
     $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // 2️⃣ Si no se encuentra, buscar en área GENERAL como fallback
     if (!$stockItem) {
         $stmt->execute([
             ':area' => 'GENERAL',
@@ -82,7 +79,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         $stockItem = $stmt->fetch(PDO::FETCH_ASSOC);
     }
     
-    // 3️⃣ Si aún no existe en stock, no hacer nada (producto sin inventario)
     if (!$stockItem) {
         return [
             'stock_reducido' => false,
@@ -95,15 +91,12 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
     $stockItemId = (int)$stockItem['id'];
     $areaEncontrada = $stockItem['area'];
     
-    // Verificar si hay stock disponible
     if ($stockActual <= 0) {
         throw new Exception("⚠️ Stock agotado para '{$productoNombre}'. No se puede vender.");
     }
     
-    // Calcular nuevo stock
     $nuevoStock = $stockActual - $cantidad;
     
-    // Actualizar stock
     $stmtUpdate = $pdo->prepare("
         UPDATE wb_stock_items
         SET stock_actual = :nuevo_stock,
@@ -115,7 +108,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':id' => $stockItemId
     ]);
     
-    // Registrar movimiento en historial
     $stmtMov = $pdo->prepare("
         INSERT INTO wb_stock_movimientos
         (stock_item_id, tipo, cantidad, stock_anterior, stock_nuevo, motivo, consumo_id, user_id)
@@ -132,7 +124,6 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
         ':user_id' => $userId
     ]);
     
-    // Verificar si llegó al stock mínimo
     $alerta = '';
     if ($nuevoStock <= $stockMinimo && $nuevoStock > 0) {
         $alerta = "⚠️ ALERTA: Stock de '{$productoNombre}' llegó al mínimo ({$nuevoStock} unidades). Reponer pronto.";
@@ -150,12 +141,9 @@ function reducirStock(PDO $pdo, string $area, string $productoNombre, float $can
 }
 
 /**
- * Sincroniza un pago de consumo con:
- *  - area_movements (como INGRESO)
- *  - la otra app de caja diaria (add_entry.php)
+ * Sincroniza un pago de consumo con area_movements y caja diaria
  */
 function syncPagoToAreaMovementsAndCaja(PDO $pdo, int $consumoId, int $pagoId) {
-    // Traer datos del consumo + pago + usuario + área
     $stmt = $pdo->prepare("
         SELECT 
             c.id            AS consumo_id,
@@ -182,7 +170,6 @@ function syncPagoToAreaMovementsAndCaja(PDO $pdo, int $consumoId, int $pagoId) {
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
-        // No hay nada que sincronizar
         return;
     }
 
@@ -209,22 +196,21 @@ function syncPagoToAreaMovementsAndCaja(PDO $pdo, int $consumoId, int $pagoId) {
         ");
         $stmtIns->execute([
             ':user_id'     => $userId > 0 ? $userId : null,
-            ':fecha'       => substr($fecha, 0, 10), // YYYY-MM-DD
+            ':fecha'       => substr($fecha, 0, 10),
             ':area'        => $area,
             ':tipo'        => 'INGRESO',
             ':origen'      => 'CONSUMO',
             ':descripcion' => $descripcion,
             ':monto'       => $monto,
             ':metodo_pago' => $metodo,
-            ':turno'       => '',        // si luego manejás turnos, podés cargarlo
+            ':turno'       => '',
             ':createdBy'   => $username,
         ]);
     } catch (Throwable $e) {
-        // Para no romper el pago si falla area_movements, lo ignoramos
+        // Ignorar si falla
     }
 
-    // 2) Enviar a la app de caja diaria (POST a add_entry.php)
-    //    Ajustá campos si tu add_entry.php espera otros nombres
+    // 2) Enviar a la app de caja diaria
     try {
         $url = "https://cajadiaria.serviciosasturias.com/add_entry.php";
 
@@ -249,14 +235,14 @@ function syncPagoToAreaMovementsAndCaja(PDO $pdo, int $consumoId, int $pagoId) {
         curl_exec($ch);
         curl_close($ch);
     } catch (Throwable $e) {
-        // Ignorar errores de red para no romper el flujo
+        // Ignorar errores de red
     }
 }
 
 try {
     $data = getRequestData();
 
-    $userId  = (int)($data['user_id'] ?? 0);   // quién registra el pago
+    $userId  = (int)($data['user_id'] ?? 0);
     $consumo = (int)($data['consumo_id'] ?? 0);
     $fecha   = trim($data['fecha'] ?? '');
     $metodo  = trim($data['metodo'] ?? '');
@@ -267,6 +253,18 @@ try {
     $banco   = trim($data['banco'] ?? '');
     $numOp   = trim($data['numero_operacion'] ?? '');
     $imgComp = trim($data['imagen_comprobante'] ?? '');
+    
+    // ✅ NUEVO: Recibir datos de tarjeta y limpiar imagenComprobante
+    $datosTarjetaRaw = $data['datos_tarjeta'] ?? null;
+    $datosTarjeta = null;
+    if ($datosTarjetaRaw) {
+        $tarjetaArray = is_array($datosTarjetaRaw) ? $datosTarjetaRaw : json_decode($datosTarjetaRaw, true);
+        if ($tarjetaArray) {
+            // Remover imagenComprobante del JSON antes de guardar
+            unset($tarjetaArray['imagenComprobante']);
+            $datosTarjeta = json_encode($tarjetaArray);
+        }
+    }
 
     requireActiveUser($pdo, $userId);
 
@@ -274,13 +272,25 @@ try {
         throw new Exception("Datos inválidos para registrar pago");
     }
 
-    if (!in_array($metodo, ['EFECTIVO','TRANSFERENCIA','CARGAR_HABITACION'], true)) {
+    // ✅ ACTUALIZADO: Incluir TARJETA_CREDITO como método válido
+    if (!in_array($metodo, ['EFECTIVO','TRANSFERENCIA','TARJETA_CREDITO','CARGAR_HABITACION'], true)) {
         throw new Exception("Método de pago inválido");
+    }
+    
+    // ✅ NUEVO: Validar datos de tarjeta
+    if ($metodo === 'TARJETA_CREDITO') {
+        $tarjetaData = json_decode($datosTarjeta, true);
+        if (!$tarjetaData || empty($tarjetaData['numeroAutorizacion'])) {
+            throw new Exception("Número de autorización es obligatorio para pagos con tarjeta");
+        }
+        if (empty($tarjetaData['tipoTarjeta']) || empty($tarjetaData['marcaTarjeta'])) {
+            throw new Exception("Tipo y marca de tarjeta son obligatorios");
+        }
     }
 
     $pdo->beginTransaction();
 
-    // ✅ NUEVO: Obtener datos del consumo para reducir stock
+    // Obtener datos del consumo para reducir stock
     $stmtCons = $pdo->prepare("
         SELECT area, consumo_descripcion, categoria, cantidad 
         FROM wb_consumos 
@@ -289,14 +299,14 @@ try {
     $stmtCons->execute([':cid' => $consumo]);
     $consumoData = $stmtCons->fetch(PDO::FETCH_ASSOC);
 
-    // Insertar pago
+    // ✅ ACTUALIZADO: Insertar pago con datos_tarjeta
     $stmt = $pdo->prepare("
         INSERT INTO wb_consumo_pagos
         (consumo_id, fecha, metodo, monto, usuario_registro_id,
-         hora, alias_cbu, banco, numero_operacion, imagen_comprobante)
+         hora, alias_cbu, banco, numero_operacion, imagen_comprobante, datos_tarjeta)
         VALUES
         (:consumo_id, :fecha, :metodo, :monto, :uid,
-         :hora, :alias, :banco, :numop, :img)
+         :hora, :alias, :banco, :numop, :img, :datos_tarjeta)
     ");
     $stmt->execute([
         ':consumo_id' => $consumo,
@@ -309,6 +319,7 @@ try {
         ':banco'      => $banco ?: null,
         ':numop'      => $numOp ?: null,
         ':img'        => $imgComp ?: null,
+        ':datos_tarjeta' => $datosTarjeta,
     ]);
     $pagoId = (int)$pdo->lastInsertId();
 
@@ -344,13 +355,11 @@ try {
         ':cid'    => $consumo,
     ]);
 
-    // ✅ Reducir stock SOLO si aún no se ha reducido
-    // Verificar si ya existe un movimiento de stock para este consumo
+    // Reducir stock SOLO si aún no se ha reducido
     $stockInfo = ['stock_reducido' => false];
     $debugInfo = [];
     
     if ($consumoData && shouldReduceStock($consumoData['categoria'])) {
-        // Verificar si ya se redujo el stock
         $stmtCheck = $pdo->prepare("
             SELECT COUNT(*) as count 
             FROM wb_stock_movimientos 
@@ -361,7 +370,6 @@ try {
         
         $debugInfo['ya_existe_movimiento'] = $checkResult['count'] > 0;
         
-        // Solo reducir si NO existe movimiento previo
         if ($checkResult['count'] == 0) {
             $area = $consumoData['area'];
             $productoNombre = $consumoData['consumo_descripcion'];
@@ -400,10 +408,9 @@ try {
         'monto_pagado'   => $totalPagado,
         'estado_actual'  => $estado,
         'stock_info'     => $stockInfo,
-        'debug_info'     => $debugInfo, // ✅ Para debug en consola
+        'debug_info'     => $debugInfo,
     ];
 
-    // Agregar alerta si existe
     if (!empty($stockInfo['alerta'])) {
         $response['alerta_stock'] = $stockInfo['alerta'];
     }
