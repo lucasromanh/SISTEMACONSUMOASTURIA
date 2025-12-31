@@ -393,6 +393,22 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     // Función auxiliar para registrar consumos (pagados o cargados a habitación)
     const registrarConsumos = async (estadoAUsar: string, montoPagadoPorProducto?: number) => {
       for (const producto of pedido.productos) {
+        // ✅ Determinar método de pago desde el array de pagos (fuente de verdad)
+        let metodoFinal: MetodoPago = undefined as any;
+        const pagosTarjeta = pagos.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
+        const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
+        
+        if (estadoAUsar === 'PAGADO') {
+          if (pagosTarjeta.length > 0) {
+            metodoFinal = 'TARJETA_CREDITO';
+          } else if (pagosTransfer.length > 0) {
+            metodoFinal = 'TRANSFERENCIA';
+          } else {
+            // Si no hay pagos en el array, usar el método del estado
+            metodoFinal = metodoPago || 'EFECTIVO';
+          }
+        }
+        
         const consumoData: any = {
           fecha: fechaActual,
           area,
@@ -404,7 +420,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
           total: producto.subtotal,
           estado: estadoAUsar,
           montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
-          metodoPago: estadoAUsar === 'PAGADO' ? metodoPago : undefined,
+          metodoPago: metodoFinal,
           usuarioRegistroId: user?.id ? String(user.id) : '',
           ticketId: pedido.ticketId, // Vincular consumo con ticket
           pagos: pagos,
@@ -413,10 +429,14 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
         if (pagos && pagos.length > 0) {
           const pagosTransfer = pagos.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
           if (pagosTransfer.length > 0) {
-            consumoData.datosTransferencia = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
+            const datosTransfer = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
+            consumoData.datosTransferencia = datosTransfer;
+            // ✅ Asegurar que la imagen de transferencia también se envíe
+            if (datosTransfer?.imagenComprobante && !consumoData.imagenComprobante) {
+              consumoData.imagenComprobante = datosTransfer.imagenComprobante;
+            }
           }
           
-          const pagosTarjeta = pagos.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
           if (pagosTarjeta.length > 0) {
             const datosTarjetaPago = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
             // Extraer imagen_comprobante como campo separado
@@ -429,6 +449,16 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
             }
           }
         }
+        
+        // ✅ DEBUG: Verificar datos antes de enviar
+        console.log('📤 Enviando consumo:', {
+          metodoPago: consumoData.metodoPago,
+          estado: consumoData.estado,
+          tieneDatosTarjeta: !!consumoData.datosTarjeta,
+          tieneImagenComprobante: !!consumoData.imagenComprobante,
+          tieneDatosTransferencia: !!consumoData.datosTransferencia
+        });
+        
         await addConsumo(consumoData);
       }
     };

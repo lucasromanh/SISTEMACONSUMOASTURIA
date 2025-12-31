@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
+import { ConsumosTable } from '@/components/consumos/ConsumosTable';
 import { ExportButtons } from '@/components/common/ExportButtons';
 import { useConsumosStore, useCajasStore } from '@/store/consumosStore';
 import { useStockStore } from '@/store/stockStore';
@@ -102,7 +103,7 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       });
     }
 
-    // 2. Agregar movimientos (ingresos/egresos) relacionados a consumos y otros
+    // 2. Agregar movimientos (ingresos/egresos) - INCLUYEN datos de comprobantes
     movimientos.forEach((m) => {
       // Saltar ingreso inicial ya agregado
       if (m.origen === 'INICIAL') return;
@@ -117,22 +118,43 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
           const [day, month, year] = parts;
           normalizedFecha = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
         } else {
-          normalizedFecha = m.fecha; // fallback
+          normalizedFecha = m.fecha;
         }
       }
 
       const hora = new Date(normalizedFecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 
       if (m.tipo === 'INGRESO' && m.origen === 'CONSUMO') {
+        // Buscar consumo correspondiente para obtener datos de comprobante
+        const consumoRelacionado = consumos.find(c => 
+          c.estado === 'PAGADO' && 
+          Math.abs((c.montoPagado || 0) - m.monto) < 0.01 &&
+          c.metodoPago === m.metodoPago
+        );
+        
+        // 🐛 DEBUG: Ver qué datos tienen
+        if (m.metodoPago === 'TRANSFERENCIA' || m.metodoPago === 'TARJETA_CREDITO') {
+          console.log('📊 Transacción de pago:', {
+            metodoPago: m.metodoPago,
+            monto: m.monto,
+            consumoEncontrado: !!consumoRelacionado,
+            tieneDatosTransferencia: !!consumoRelacionado?.datosTransferencia,
+            tieneImagenEnTransferencia: !!(consumoRelacionado?.datosTransferencia as any)?.imagenComprobante,
+            tieneDatosTarjeta: !!consumoRelacionado?.datosTarjeta,
+            tieneImagenDirecta: !!consumoRelacionado?.imagenComprobante,
+          });
+        }
+        
         transacciones.push({
           tipo: 'CONSUMO',
           hora,
           descripcion: m.descripcion,
           monto: m.monto,
-          metodoPago: m.metodoPago || undefined,
+          metodoPago: m.metodoPago || 'EFECTIVO',
           icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
-          datosTransferencia: m.datosTransferencia,
-          datosTarjeta: (m as any).datosTarjeta,
+          datosTransferencia: consumoRelacionado?.datosTransferencia,
+          datosTarjeta: consumoRelacionado?.datosTarjeta,
+          imagenComprobante: consumoRelacionado?.imagenComprobante,
         });
       }
 
@@ -150,16 +172,21 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
     // 3. Agregar consumos que no tengan movimiento asociado (evitar duplicados)
     consumos.forEach((c) => {
-      // Buscar si existe un movimiento con la misma descripción y monto
-      const movimientoExistente = movimientos.find((m) => m.descripcion && m.descripcion.includes(c.consumoDescripcion) && Math.abs(m.monto - (c.montoPagado || c.total)) < 0.01);
-      if (!movimientoExistente) {
+      // Buscar si existe un movimiento con el mismo monto y método
+      const movimientoExistente = movimientos.find((m) => 
+        m.tipo === 'INGRESO' && 
+        m.origen === 'CONSUMO' && 
+        Math.abs(m.monto - (c.montoPagado || c.total)) < 0.01
+      );
+      
+      if (!movimientoExistente && c.estado === 'PAGADO') {
         const hora = new Date(c.fecha + 'T12:00:00').toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
         transacciones.push({
           tipo: 'CONSUMO',
           hora,
           descripcion: `${c.consumoDescripcion} - ${/^\d+$/.test(c.habitacionOCliente.trim()) ? `Hab. ${c.habitacionOCliente}` : c.habitacionOCliente} (${c.cantidad}x)`,
-          monto: c.estado === 'PAGADO' ? (c.montoPagado || 0) : c.total,
-          metodoPago: c.estado === 'PAGADO' ? (c.metodoPago || 'EFECTIVO') : 'CARGAR_HABITACION',
+          monto: c.montoPagado || 0,
+          metodoPago: c.metodoPago || 'EFECTIVO',
           icono: <ShoppingCart className="h-5 w-5 text-green-600" />,
           datosTransferencia: c.datosTransferencia,
           datosTarjeta: c.datosTarjeta,
@@ -199,6 +226,10 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + m.monto, 0);
 
+    const consumosTarjeta = movimientos
+      .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TARJETA_CREDITO')
+      .reduce((sum, m) => sum + m.monto, 0);
+
     // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
@@ -214,13 +245,14 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + g.monto, 0));
     const gastosEfectivo = totalGastos;
 
-    const totalIngresos = ingresoInicial + consumosEfectivo + consumosTransferencia;
+    const totalIngresos = ingresoInicial + consumosEfectivo + consumosTransferencia + consumosTarjeta;
     const saldoFinal = ingresoInicial + consumosEfectivo - gastosEfectivo;
 
     return {
       ingresoInicial,
       consumosEfectivo,
       consumosTransferencia,
+      consumosTarjeta,
       consumosCargados,
       totalGastos,
       gastosEfectivo,
@@ -303,6 +335,13 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Transferencia</p>
               <p className="text-lg sm:text-2xl font-bold text-blue-700 dark:text-blue-400">{formatCurrency(totalesDia.consumosTransferencia)}</p>
             </div>
+            <div className="space-y-1">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Consumos Tarjeta</p>
+              <p className="text-lg sm:text-2xl font-bold text-purple-700 dark:text-purple-400">{formatCurrency(totalesDia.consumosTarjeta)}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 w-full">
             <div className="space-y-1">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">Gastos</p>
               <p className="text-lg sm:text-2xl font-bold text-red-700 dark:text-red-400">-{formatCurrency(totalesDia.gastosEfectivo)}</p>
@@ -407,6 +446,16 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Consumos del Día */}
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-base sm:text-lg">Consumos del Día</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ConsumosTable consumos={consumos} />
         </CardContent>
       </Card>
       </div>

@@ -61,6 +61,14 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         }
       }
 
+      // 🐛 DEBUG: Ver qué se envía al backend
+      console.log('📤 Datos enviados al backend:', {
+        metodo_pago: backendData.metodo_pago,
+        estado: backendData.estado,
+        tiene_datos_tarjeta: !!backendData.datos_tarjeta,
+        tiene_imagen_comprobante: !!backendData.imagen_comprobante,
+      });
+
       // Llamar al backend para crear el consumo
       const response = await consumosService.createConsumo(backendData);
 
