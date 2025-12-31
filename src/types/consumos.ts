@@ -56,7 +56,10 @@ export interface Consumo {
     hora?: string;
     aliasCbu?: string;
     banco?: string;
-    numeroOperacion?: sDatosTransferencia;
+    numeroOperacion?: string;
+    imagenComprobante?: string;
+  };
   
   // Datos de tarjeta de crédito (deprecated, usar pagos[])
-  datosTarjeta?: DatosTarjeta
+  datosTarjeta?: DatosTarjeta;
+}
