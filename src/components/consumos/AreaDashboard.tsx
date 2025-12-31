@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { ConsumoForm } from '@/components/consumos/ConsumoForm';
 import { ConsumosTable } from '@/components/consumos/ConsumosTable';
 import { ExportButtons } from '@/components/common/ExportButtons';
@@ -22,6 +24,8 @@ interface AreaDashboardProps {
 
 export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashboardProps) {
   const [fechaSeleccionada, setFechaSeleccionada] = useState<Date>(new Date());
+  const [comprobanteModalOpen, setComprobanteModalOpen] = useState(false);
+  const [imagenComprobante, setImagenComprobante] = useState<string>('');
   const { consumos: allConsumos, loadConsumos } = useConsumosStore();
   const { movimientos: allMovimientos, loadMovimientos } = useCajasStore();
   const { getGastosByDateRange } = useStockStore();
@@ -406,28 +410,24 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                           <button
                             onClick={() => {
                               const img = (transaccion as any).datosTransferencia.imagenComprobante;
-                              const w = window.open();
-                              if (w) {
-                                w.document.write(`<img src="${img}" style="max-width:100%"/>`);
-                              }
+                              setImagenComprobante(img);
+                              setComprobanteModalOpen(true);
                             }}
                             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                           >
                             Ver comprobante
                           </button>
                         )}
-                        {transaccion.metodoPago === 'TARJETA_CREDITO' && (((transaccion as any).datosTarjeta?.imagenComprobante) || ((transaccion as any).imagenComprobante)) && (
+                        {transaccion.metodoPago === 'TARJETA_CREDITO' && (transaccion as any).datosTarjeta?.imagenComprobante && (
                           <button
                             onClick={() => {
-                              const img = (transaccion as any).datosTarjeta?.imagenComprobante || (transaccion as any).imagenComprobante;
-                              const w = window.open();
-                              if (w) {
-                                w.document.write(`<img src="${img}" style="max-width:100%; background:#000; display:flex; justify-content:center; align-items:center; min-height:100vh;"/>`);
-                              }
+                              const img = (transaccion as any).datosTarjeta.imagenComprobante;
+                              setImagenComprobante(img);
+                              setComprobanteModalOpen(true);
                             }}
-                            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                            className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
                           >
-                            Ver comprobante
+                            Ver comprobante posnet
                           </button>
                         )}
                       </div>
@@ -458,6 +458,40 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
           <ConsumosTable consumos={consumos} />
         </CardContent>
       </Card>
+
+      {/* Modal de Comprobante */}
+      <Dialog open={comprobanteModalOpen} onOpenChange={setComprobanteModalOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Comprobante</DialogTitle>
+          </DialogHeader>
+          <div className="relative w-full">
+            <img
+              src={imagenComprobante}
+              alt="Comprobante"
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const link = document.createElement('a');
+                link.download = `comprobante-${Date.now()}.png`;
+                link.href = imagenComprobante;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+            >
+              Descargar
+            </Button>
+            <Button onClick={() => setComprobanteModalOpen(false)}>
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       </div>
     </div>
   );

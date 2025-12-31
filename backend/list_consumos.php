@@ -154,8 +154,12 @@ try {
         // Si tiene datos de tarjeta desde wb_consumos
         if (!empty($row['consumo_datos_tarjeta'])) {
             $consumo['datosTarjeta'] = json_decode($row['consumo_datos_tarjeta'], true);
-            // Agregar imagen del comprobante desde wb_consumos si existe
-            if (!empty($row['consumo_imagen_comprobante'])) {
+            // ✅ PRIORIZAR imagen desde wb_consumo_pagos para tarjetas (comprobante del posnet)
+            if (!empty($row['pago_imagen_tarjeta'])) {
+                $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
+            }
+            // Solo usar consumo_imagen_comprobante si NO hay imagen en pagos (fallback)
+            elseif (!empty($row['consumo_imagen_comprobante'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['consumo_imagen_comprobante'];
             }
         }

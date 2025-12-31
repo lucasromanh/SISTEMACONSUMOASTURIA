@@ -277,19 +277,19 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                 {/* ✅ Botón de Comprobante TARJETA DE CRÉDITO */}
                 {consumo.metodoPago === 'TARJETA_CREDITO' && (
                   <div className="w-full">
-                    {((consumo as any).datosTarjeta?.imagenComprobante || (consumo as any).imagenComprobante) ? (
+                    {(consumo as any).datosTarjeta?.imagenComprobante ? (
                       <Button
                         size="sm"
                         variant="secondary"
                         onClick={() => {
-                          const img = (consumo as any).datosTarjeta?.imagenComprobante || (consumo as any).imagenComprobante;
+                          const img = (consumo as any).datosTarjeta.imagenComprobante;
                           setImagenComprobante(img);
                           setComprobanteModalOpen(true);
                         }}
                         className="w-full flex items-center justify-center gap-2 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60"
                       >
                         <FileImage className="h-4 w-4" />
-                        Comprobante Tarjeta
+                        Comprobante Posnet
                       </Button>
                     ) : (
                       <div className="w-full py-1.5 bg-gray-100 dark:bg-gray-800 rounded text-center text-xs text-muted-foreground italic">

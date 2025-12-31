@@ -9,7 +9,7 @@ import { IngresoInicialForm } from '@/components/cajas/IngresoInicialForm';
 import { ExportButtons } from '@/components/common/ExportButtons';
 import { SincronizarCajaHotelButton } from '@/components/cajas/SincronizarCajaHotelButton';
 import { CierreCajaButton } from '@/components/cajas/CierreCajaButton';
-import { useCajasStore } from '@/store/consumosStore';
+import { useCajasStore, useConsumosStore } from '@/store/consumosStore';
 import { useAuthStore } from '@/store/authStore';
 import { getDateRangeByPeriod } from '@/utils/dateHelpers';
 import { exportToCsv } from '@/utils/exportToCsv';
@@ -18,6 +18,7 @@ import type { AreaConsumo } from '@/types/consumos';
 export function CajasResumenPage() {
   const [periodo, setPeriodo] = useState<'day' | 'week' | 'month'>('day');
   const { getMovimientosByDateRange, movimientos: allMovimientos, loadMovimientos } = useCajasStore();
+  const { getConsumosByDateRange, consumos: allConsumos, loadConsumos } = useConsumosStore();
   const { user } = useAuthStore();
 
   // Determinar el área según el rol del usuario
@@ -30,16 +31,22 @@ export function CajasResumenPage() {
     return undefined;
   }, [user]);
 
-  // ✅ Cargar movimientos automáticamente cuando cambia el periodo o área
+  // ✅ Cargar movimientos y consumos automáticamente cuando cambia el periodo o área
   useEffect(() => {
     const { start, end } = getDateRangeByPeriod(periodo);
     loadMovimientos(area, start, end);
-  }, [periodo, area, loadMovimientos]);
+    loadConsumos(area, start, end);
+  }, [periodo, area, loadMovimientos, loadConsumos]);
 
   const movimientos = useMemo(() => {
     const { start, end } = getDateRangeByPeriod(periodo);
     return getMovimientosByDateRange(start, end, area);
   }, [periodo, area, getMovimientosByDateRange, allMovimientos]);
+
+  const consumos = useMemo(() => {
+    const { start, end } = getDateRangeByPeriod(periodo);
+    return getConsumosByDateRange(start, end, area);
+  }, [periodo, area, getConsumosByDateRange, allConsumos]);
 
   // Separar movimientos sincronizados y no sincronizados
   const movimientosSinSincronizar = useMemo(() =>
@@ -62,12 +69,13 @@ export function CajasResumenPage() {
       .reduce((sum, m) => sum + m.monto, 0);
 
     const totalIngresosTransferencia = ingresos
-      .filter((m) => m.metodoPago === 'TRANSFERENCIA' && m.origen !== 'INICIAL')
+      .filter((m) => m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + m.monto, 0);
 
-    const totalIngresosTarjeta = ingresos
-      .filter((m) => m.metodoPago === 'TARJETA_CREDITO' && m.origen !== 'INICIAL')
-      .reduce((sum, m) => sum + m.monto, 0);
+    // ✅ CORREGIDO: Obtener ingresos de tarjeta desde CONSUMOS, no desde movimientos
+    const totalIngresosTarjeta = consumos
+      .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO')
+      .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
 
     const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
 
@@ -78,7 +86,7 @@ export function CajasResumenPage() {
       totalEgresos,
       totalNeto: totalIngresosEfectivo + totalIngresosTransferencia + totalIngresosTarjeta - totalEgresos,
     };
-  }, [movimientos]);
+  }, [movimientos, consumos]);
 
   const handleExportCSV = () => {
     exportToCsv(
