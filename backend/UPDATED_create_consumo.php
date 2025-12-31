@@ -232,6 +232,9 @@ try {
 
     try {
         // ✅ ACTUALIZADO: Insertar consumo con datos_tarjeta e imagen_comprobante
+        // NOTA: Para tarjetas, NO guardamos imagen_comprobante en wb_consumos (se guarda solo en wb_consumo_pagos)
+        $imagenParaConsumo = ($metodoPago === 'TARJETA_CREDITO') ? null : ($imagenComprobante ?: null);
+        
         $stmt = $pdo->prepare("
             INSERT INTO wb_consumos
             (fecha, area, habitacion_cliente, consumo_descripcion, categoria,
@@ -255,7 +258,7 @@ try {
             ':metodo_pago' => $metodoPago ?: null,
             ':monto_pagado'=> $montoPagado,
             ':datos_tarjeta' => $datosTarjeta,
-            ':imagen_comprobante' => $imagenComprobante ?: null,
+            ':imagen_comprobante' => $imagenParaConsumo,
             ':uid'         => $userId,
             ':ticket_id'   => $ticketId ?: null,
         ]);
