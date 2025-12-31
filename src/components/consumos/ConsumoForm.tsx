@@ -867,6 +867,7 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                       <SelectContent>
                         <SelectItem value="EFECTIVO">💵 Efectivo</SelectItem>
                         <SelectItem value="TRANSFERENCIA">🏦 Transferencia</SelectItem>
+                        <SelectItem value="TARJETA_CREDITO">💳 Tarjeta de Crédito/Débito</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

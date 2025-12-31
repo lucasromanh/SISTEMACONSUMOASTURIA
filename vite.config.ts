@@ -10,4 +10,16 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+  // Configuración para SPA - todas las rutas van al index.html
+  preview: {
+    port: 4173,
+    strictPort: true,
+  },
 })
