@@ -89,8 +89,14 @@ try {
         ':id'          => $ticketId,
     ]);
 
-    // ✅ ACTUALIZADO: Crear movimiento incluyendo tarjeta
-    if ($totEfec > 0 || $totTrans > 0 || $totTarjeta > 0) {
+    // ✅ ACTUALIZADO: Solo crear movimiento si NO existen consumos PAGADOS para este ticket
+    // Si los consumos ya están PAGADOS, ya se crearon movimientos en wb_consumo_pagos
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM wb_consumos WHERE ticket_id = :tid AND estado = 'PAGADO'");
+    $stmt->execute([':tid' => $ticketId]);
+    $consumosPagados = (int)$stmt->fetchColumn();
+    
+    // Solo crear movimiento si no hay consumos pagados (flujo antiguo de cerrar ticket)
+    if (($totEfec > 0 || $totTrans > 0 || $totTarjeta > 0) && $consumosPagados === 0) {
         $movimientoData = [
             'area' => $ticket['area'],
             'tipo' => 'INGRESO',

@@ -467,14 +467,23 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
     const cerrarTicket = async () => {
       if (!pedido.ticketId || !user) return;
 
+      // ✅ Determinar el método de pago desde el array de pagos
+      let metodoReal: MetodoPago = 'EFECTIVO';
+      if (pagos && pagos.length > 0) {
+        const ultimoPago = pagos[pagos.length - 1];
+        metodoReal = ultimoPago.metodo;
+      } else {
+        metodoReal = metodoPago || 'EFECTIVO';
+      }
+
       try {
         await ticketsService.closeTicket({
           user_id: user.id,
           ticket_id: pedido.ticketId,
           fecha_cierre: new Date().toISOString(),
-          total_efectivo: metodoPago === 'EFECTIVO' ? totalPedido : 0,
-          total_transferencia: metodoPago === 'TRANSFERENCIA' ? totalPedido : 0,
-          total_tarjeta: metodoPago === 'TARJETA_CREDITO' ? totalPedido : 0,
+          total_efectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
+          total_transferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
+          total_tarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
           total_habitacion: estadoFinal === 'CARGAR_HABITACION' ? totalPedido : 0,
           notas_cierre: `Hab/Cliente: ${habitacionOCliente}`,
         });
