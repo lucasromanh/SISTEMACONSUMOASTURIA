@@ -51,15 +51,27 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
   const consumos = useMemo(() => {
     const filtered = allConsumos.filter((c) => c.fecha === fechaISO && c.area === area);
     console.log('🔍 CONSUMOS FILTRADOS:', filtered.length);
-    filtered.forEach(c => {
+    
+    // ✅ PARSEAR datosTarjeta si viene como string
+    const consumosParsed = filtered.map(c => {
+      if (c.metodoPago === 'TARJETA_CREDITO' && typeof (c as any).datosTarjeta === 'string') {
+        try {
+          (c as any).datosTarjeta = JSON.parse((c as any).datosTarjeta);
+        } catch (e) {
+          console.error('Error parseando datosTarjeta:', e);
+        }
+      }
+      
       if (c.metodoPago === 'TARJETA_CREDITO') {
         console.log('💳 CONSUMO TARJETA COMPLETO:', c);
         console.log('💳 datosTarjeta:', (c as any).datosTarjeta);
         console.log('💳 tieneImagen en datosTarjeta:', !!(c as any).datosTarjeta?.imagenComprobante);
         console.log('💳 imagen_comprobante directo:', (c as any).imagen_comprobante);
       }
+      return c;
     });
-    return filtered;
+    
+    return consumosParsed;
   }, [fechaISO, area, allConsumos]);
 
   // Filtrar movimientos del día seleccionado
