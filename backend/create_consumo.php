@@ -299,6 +299,37 @@ try {
                 ':datos_tarjeta' => $datosTarjeta,
                 ':imagen_comprobante' => $imagenComprobante ?: null,
             ]);
+            
+            // ✅ NUEVO: Crear movimiento de caja para sincronización con Caja del Hotel
+            // Solo para EFECTIVO, TRANSFERENCIA y TARJETA_CREDITO (no para CARGAR_HABITACION)
+            if (in_array($metodoPago, ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_CREDITO'])) {
+                $habitacionOCliente = trim($habitacionOCliente) ?: 'Cliente';
+                $descripcionMov = "Pago consumo hab/cliente {$habitacionOCliente} - {$desc} (Consumo #{$consumoId})";
+                
+                try {
+                    $stmtMov = $pdo->prepare("
+                        INSERT INTO area_movements
+                        (user_id, fecha, area, tipo, origen, descripcion, monto, metodo_pago, turno, createdBy)
+                        VALUES
+                        (:user_id, :fecha, :area, :tipo, :origen, :descripcion, :monto, :metodo_pago, :turno, :createdBy)
+                    ");
+                    $stmtMov->execute([
+                        ':user_id'     => $userId,
+                        ':fecha'       => substr($fecha, 0, 10),
+                        ':area'        => $area,
+                        ':tipo'        => 'INGRESO',
+                        ':origen'      => 'CONSUMO',
+                        ':descripcion' => $descripcionMov,
+                        ':monto'       => $montoPagado,
+                        ':metodo_pago' => $metodoPago,
+                        ':turno'       => '',
+                        ':createdBy'   => 'sistema',
+                    ]);
+                } catch (Throwable $movErr) {
+                    // Si falla el movimiento, no romper el consumo
+                    error_log("⚠️ Error creando movimiento de caja: " . $movErr->getMessage());
+                }
+            }
         }
 
         // Reducir stock si la categoría lo requiere

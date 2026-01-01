@@ -49,7 +49,19 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
   // Filtrar consumos del día seleccionado
   const consumos = useMemo(() => {
-    return allConsumos.filter((c) => c.fecha === fechaISO && c.area === area);
+    const filtered = allConsumos.filter((c) => c.fecha === fechaISO && c.area === area);
+    console.log('🔍 CONSUMOS FILTRADOS:', filtered.length);
+    filtered.forEach(c => {
+      if (c.metodoPago === 'TARJETA_CREDITO') {
+        console.log('💳 CONSUMO TARJETA:', {
+          id: c.id,
+          metodoPago: c.metodoPago,
+          datosTarjeta: (c as any).datosTarjeta,
+          tieneImagen: !!(c as any).datosTarjeta?.imagenComprobante
+        });
+      }
+    });
+    return filtered;
   }, [fechaISO, area, allConsumos]);
 
   // Filtrar movimientos del día seleccionado
@@ -230,9 +242,10 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + m.monto, 0);
 
-    const consumosTarjeta = movimientos
-      .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TARJETA_CREDITO')
-      .reduce((sum, m) => sum + m.monto, 0);
+    // ✅ CORREGIDO: Tarjeta desde CONSUMOS, no desde movimientos (no generan movimientos de caja)
+    const consumosTarjeta = consumos
+      .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO')
+      .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
 
     // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
@@ -421,7 +434,9 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                         {transaccion.metodoPago === 'TARJETA_CREDITO' && (transaccion as any).datosTarjeta?.imagenComprobante && (
                           <button
                             onClick={() => {
+                              console.log('🖼️ TARJETA - datosTarjeta completo:', (transaccion as any).datosTarjeta);
                               const img = (transaccion as any).datosTarjeta.imagenComprobante;
+                              console.log('🖼️ TARJETA - Imagen:', img?.substring(0, 50));
                               setImagenComprobante(img);
                               setComprobanteModalOpen(true);
                             }}
