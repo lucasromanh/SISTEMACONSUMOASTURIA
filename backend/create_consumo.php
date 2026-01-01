@@ -284,6 +284,20 @@ try {
 
         // ✅ NUEVO: Si el consumo es PAGADO, crear registro en wb_consumo_pagos
         if ($estado === 'PAGADO' && $metodoPago && $montoPagado > 0) {
+            // 🔍 DEBUG: Ver qué se va a guardar
+            error_log("🔍 CREATE - Guardando wb_consumo_pagos:");
+            error_log("  - consumo_id: {$consumoId}");
+            error_log("  - metodo: {$metodoPago}");
+            error_log("  - imagen_comprobante length: " . strlen($imagenComprobante));
+            
+            file_put_contents($debugFile, 
+                date('Y-m-d H:i:s') . " - GUARDANDO wb_consumo_pagos\n" .
+                "  - consumo_id: {$consumoId}\n" .
+                "  - metodo: {$metodoPago}\n" .
+                "  - imagen_comprobante length: " . strlen($imagenComprobante) . "\n",
+                FILE_APPEND
+            );
+            
             $stmtPago = $pdo->prepare("
                 INSERT INTO wb_consumo_pagos
                 (consumo_id, fecha, metodo, monto, usuario_registro_id, datos_tarjeta, imagen_comprobante)
@@ -299,6 +313,9 @@ try {
                 ':datos_tarjeta' => $datosTarjeta,
                 ':imagen_comprobante' => $imagenComprobante ?: null,
             ]);
+            
+            $pagoId = $pdo->lastInsertId();
+            file_put_contents($debugFile, "  - pago_id insertado: {$pagoId}\n", FILE_APPEND);
             
             // ✅ NUEVO: Crear movimiento de caja para sincronización con Caja del Hotel
             // Solo para EFECTIVO, TRANSFERENCIA y TARJETA_CREDITO (no para CARGAR_HABITACION)

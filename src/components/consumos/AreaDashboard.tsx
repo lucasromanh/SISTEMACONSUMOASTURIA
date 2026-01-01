@@ -53,12 +53,10 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     console.log('🔍 CONSUMOS FILTRADOS:', filtered.length);
     filtered.forEach(c => {
       if (c.metodoPago === 'TARJETA_CREDITO') {
-        console.log('💳 CONSUMO TARJETA:', {
-          id: c.id,
-          metodoPago: c.metodoPago,
-          datosTarjeta: (c as any).datosTarjeta,
-          tieneImagen: !!(c as any).datosTarjeta?.imagenComprobante
-        });
+        console.log('💳 CONSUMO TARJETA COMPLETO:', c);
+        console.log('💳 datosTarjeta:', (c as any).datosTarjeta);
+        console.log('💳 tieneImagen en datosTarjeta:', !!(c as any).datosTarjeta?.imagenComprobante);
+        console.log('💳 imagen_comprobante directo:', (c as any).imagen_comprobante);
       }
     });
     return filtered;

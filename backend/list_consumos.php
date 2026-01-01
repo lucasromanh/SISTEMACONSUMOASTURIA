@@ -68,8 +68,10 @@ try {
 
     $role = requireActiveUser($pdo, $userId);
 
-    // ✅ MODIFICADO: Agregar LEFT JOIN con wb_consumo_pagos para traer datos de transferencia y tarjeta
-    // Usar alias diferentes para evitar conflictos de nombres
+    // ✅ IMPORTANTE: Aumentar límite de GROUP_CONCAT para imágenes base64 largas
+    $pdo->exec("SET SESSION group_concat_max_len = 10000000");
+
+    // ✅ MODIFICADO: Usar subconsultas en lugar de GROUP_CONCAT para evitar límites
     $sql = "SELECT c.id, c.fecha, c.area, c.habitacion_cliente, c.consumo_descripcion, 
                    c.categoria, c.precio_unitario, c.cantidad, c.total, c.estado,
                    c.monto_pagado, c.metodo_pago, c.usuario_registro_id, c.ticket_id,
@@ -77,16 +79,15 @@ try {
                    u.username AS usuario_registro,
                    c.datos_tarjeta AS consumo_datos_tarjeta,
                    c.imagen_comprobante AS consumo_imagen_comprobante,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.imagen_comprobante END) AS pago_imagen_transferencia,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.numero_operacion END) AS pago_numero_operacion,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.banco END) AS pago_banco,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.alias_cbu END) AS pago_alias_cbu,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TRANSFERENCIA' THEN p.hora END) AS pago_hora_transferencia,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TARJETA_CREDITO' THEN p.datos_tarjeta END) AS pago_datos_tarjeta,
-                   GROUP_CONCAT(DISTINCT CASE WHEN p.metodo = 'TARJETA_CREDITO' THEN p.imagen_comprobante END) AS pago_imagen_tarjeta
+                   (SELECT p.imagen_comprobante FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA' LIMIT 1) AS pago_imagen_transferencia,
+                   (SELECT p.numero_operacion FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA' LIMIT 1) AS pago_numero_operacion,
+                   (SELECT p.banco FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA' LIMIT 1) AS pago_banco,
+                   (SELECT p.alias_cbu FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA' LIMIT 1) AS pago_alias_cbu,
+                   (SELECT p.hora FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TRANSFERENCIA' LIMIT 1) AS pago_hora_transferencia,
+                   (SELECT p.datos_tarjeta FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TARJETA_CREDITO' LIMIT 1) AS pago_datos_tarjeta,
+                   (SELECT p.imagen_comprobante FROM wb_consumo_pagos p WHERE p.consumo_id = c.id AND p.metodo = 'TARJETA_CREDITO' LIMIT 1) AS pago_imagen_tarjeta
             FROM wb_consumos c
             LEFT JOIN wb_users u ON u.id = c.usuario_registro_id
-            LEFT JOIN wb_consumo_pagos p ON p.consumo_id = c.id
             WHERE 1=1";
     $params = [];
 
@@ -114,7 +115,7 @@ try {
         $params[':estado'] = $estado;
     }
 
-    $sql .= " GROUP BY c.id ORDER BY c.fecha DESC, c.id DESC";
+    $sql .= " ORDER BY c.fecha DESC, c.id DESC";
 
     // 🔍 DEBUG: Log del SQL ejecutado
     $debugMsg = date('Y-m-d H:i:s') . " - SQL ejecutado con " . count($params) . " parámetros\n";
@@ -154,18 +155,30 @@ try {
         // Si tiene datos de tarjeta desde wb_consumos
         if (!empty($row['consumo_datos_tarjeta'])) {
             $consumo['datosTarjeta'] = json_decode($row['consumo_datos_tarjeta'], true);
+            
+            // 🔍 DEBUG: Ver qué hay en pago_imagen_tarjeta
+            $imagenLength = strlen($row['pago_imagen_tarjeta'] ?? '');
+            $debugMsg = "  → Consumo #{$row['id']} tiene consumo_datos_tarjeta, pago_imagen_tarjeta length: {$imagenLength}\n";
+            file_put_contents($debugFile, $debugMsg, FILE_APPEND);
+            
             // ✅ PRIORIZAR imagen desde wb_consumo_pagos para tarjetas (comprobante del posnet)
             if (!empty($row['pago_imagen_tarjeta'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
+                file_put_contents($debugFile, "  → ✅ Imagen agregada desde pago_imagen_tarjeta\n", FILE_APPEND);
             }
             // Solo usar consumo_imagen_comprobante si NO hay imagen en pagos (fallback)
             elseif (!empty($row['consumo_imagen_comprobante'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['consumo_imagen_comprobante'];
+                file_put_contents($debugFile, "  → ✅ Imagen agregada desde consumo_imagen_comprobante\n", FILE_APPEND);
+            } else {
+                file_put_contents($debugFile, "  → ⚠️ NO hay imagen disponible para tarjeta\n", FILE_APPEND);
             }
         }
         // Si no hay en consumos, buscar en pagos
         elseif (!empty($row['pago_datos_tarjeta'])) {
             $consumo['datosTarjeta'] = json_decode($row['pago_datos_tarjeta'], true);
+            $imagenLength = strlen($row['pago_imagen_tarjeta'] ?? '');
+            file_put_contents($debugFile, "  → Usando pago_datos_tarjeta, imagen length: {$imagenLength}\n", FILE_APPEND);
             // Agregar imagen del comprobante desde wb_consumo_pagos si existe
             if (!empty($row['pago_imagen_tarjeta'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
