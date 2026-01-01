@@ -303,8 +303,8 @@ try {
             // ✅ NUEVO: Crear movimiento de caja para sincronización con Caja del Hotel
             // Solo para EFECTIVO, TRANSFERENCIA y TARJETA_CREDITO (no para CARGAR_HABITACION)
             if (in_array($metodoPago, ['EFECTIVO', 'TRANSFERENCIA', 'TARJETA_CREDITO'])) {
-                $habitacionOCliente = trim($habitacionOCliente) ?: 'Cliente';
-                $descripcionMov = "Pago consumo hab/cliente {$habitacionOCliente} - {$desc} (Consumo #{$consumoId})";
+                $habitCliente = trim($habCli) ?: 'Cliente';
+                $descripcionMov = "Pago consumo hab/cliente {$habitCliente} - {$desc} (Consumo #{$consumoId})";
                 
                 try {
                     $stmtMov = $pdo->prepare("

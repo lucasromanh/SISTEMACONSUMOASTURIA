@@ -71,19 +71,19 @@ export function CajasResumenPage() {
     // Incluye todos los ingresos en efectivo (consumos + ingresos iniciales)
     const totalIngresosEfectivo = ingresos
       .filter((m) => m.metodoPago === 'EFECTIVO' || m.origen === 'INICIAL')
-      .reduce((sum, m) => sum + m.monto, 0);
+      .reduce((sum, m) => sum + Number(m.monto), 0);
 
     const totalIngresosTransferencia = ingresos
       .filter((m) => m.metodoPago === 'TRANSFERENCIA')
-      .reduce((sum, m) => sum + m.monto, 0);
+      .reduce((sum, m) => sum + Number(m.monto), 0);
 
     // ✅ CORREGIDO: Obtener ingresos de tarjeta desde CONSUMOS, no desde movimientos
     const consumosTarjeta = consumos.filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO');
     console.log('💳 CONSUMOS TARJETA:', consumosTarjeta.length, consumosTarjeta);
     
-    const totalIngresosTarjeta = consumosTarjeta.reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
+    const totalIngresosTarjeta = consumosTarjeta.reduce((sum, c) => sum + Number(c.montoPagado || c.total), 0);
 
-    const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
+    const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto), 0);
 
     console.log('📊 TOTALES:', {
       efectivo: totalIngresosEfectivo,

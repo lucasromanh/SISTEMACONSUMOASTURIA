@@ -232,34 +232,34 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
     // Usar movimientos como fuente de verdad para totales financieros
     const ingresoInicial = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'INICIAL')
-      .reduce((sum: number, m: MovimientoCaja) => sum + m.monto, 0);
+      .reduce((sum: number, m: MovimientoCaja) => sum + Number(m.monto), 0);
 
     const consumosEfectivo = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'EFECTIVO')
-      .reduce((sum, m) => sum + m.monto, 0);
+      .reduce((sum, m) => sum + Number(m.monto), 0);
 
     const consumosTransferencia = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
-      .reduce((sum, m) => sum + m.monto, 0);
+      .reduce((sum, m) => sum + Number(m.monto), 0);
 
     // ✅ CORREGIDO: Tarjeta desde CONSUMOS, no desde movimientos (no generan movimientos de caja)
     const consumosTarjeta = consumos
       .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO')
-      .reduce((sum, c) => sum + (c.montoPagado || c.total), 0);
+      .reduce((sum, c) => sum + Number(c.montoPagado || c.total), 0);
 
     // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
-      .reduce((sum, c) => sum + c.total, 0);
+      .reduce((sum, c) => sum + Number(c.total), 0);
 
     const consumosCargadosFromMov = movimientos
       .filter((m) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && (!m.metodoPago || m.metodoPago === undefined))
-      .reduce((sum, m) => sum + m.monto, 0);
+      .reduce((sum, m) => sum + Number(m.monto), 0);
 
     const consumosCargados = Math.max(consumosCargadosFromConsumos, consumosCargadosFromMov);
 
-    const totalGastosFromMov = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, m) => sum + m.monto, 0);
-    const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + g.monto, 0));
+    const totalGastosFromMov = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, m) => sum + Number(m.monto), 0);
+    const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + Number(g.monto), 0));
     const gastosEfectivo = totalGastos;
 
     const totalIngresos = ingresoInicial + consumosEfectivo + consumosTransferencia + consumosTarjeta;
