@@ -28,9 +28,10 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
   const [metodoPago, setMetodoPago] = useState<MetodoPago>('EFECTIVO');
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
-  // ✅ Estado para modal de comprobante de transferencia
+  // ✅ Estado para modal de comprobante (transferencia o tarjeta)
   const [comprobanteModalOpen, setComprobanteModalOpen] = useState(false);
   const [imagenComprobante, setImagenComprobante] = useState<string>('');
+  const [tipoComprobante, setTipoComprobante] = useState<'TRANSFERENCIA' | 'TARJETA'>('TRANSFERENCIA');
 
   const handlePagarConsumo = (consumo: Consumo) => {
     setConsumoAPagar(consumo);
@@ -77,23 +78,23 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="text-xs lg:text-sm">Fecha</TableHead>
-                <TableHead className="text-xs lg:text-sm">Habitación/Cliente</TableHead>
-                <TableHead className="text-xs lg:text-sm">Consumo</TableHead>
-                <TableHead className="hidden xl:table-cell text-xs lg:text-sm">Categoría</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[100px]">Fecha</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[150px] max-w-[200px]">Habitación/Cliente</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[120px]">Consumo</TableHead>
+                <TableHead className="hidden xl:table-cell text-xs lg:text-sm min-w-[100px]">Categoría</TableHead>
                 <TableHead className="hidden lg:table-cell text-right text-xs lg:text-sm">Cantidad</TableHead>
                 <TableHead className="hidden lg:table-cell text-right text-xs lg:text-sm">Precio Unit.</TableHead>
-                <TableHead className="text-right text-xs lg:text-sm">Total</TableHead>
-                <TableHead className="text-xs lg:text-sm">Estado</TableHead>
-                <TableHead className="text-xs lg:text-sm">Método Pago</TableHead>
-                <TableHead className="text-xs lg:text-sm">Acciones</TableHead>
+                <TableHead className="text-right text-xs lg:text-sm min-w-[90px]">Total</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[80px]">Estado</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[120px]">Método Pago</TableHead>
+                <TableHead className="text-xs lg:text-sm min-w-[100px]">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {consumos.map((consumo) => (
                 <TableRow key={consumo.id}>
                   <TableCell className="whitespace-nowrap text-xs lg:text-sm">{formatDate(consumo.fecha)}</TableCell>
-                  <TableCell className="font-medium text-xs lg:text-sm">{consumo.habitacionOCliente}</TableCell>
+                  <TableCell className="font-medium text-xs lg:text-sm max-w-[200px] truncate" title={consumo.habitacionOCliente}>{consumo.habitacionOCliente}</TableCell>
                   <TableCell className="text-xs lg:text-sm">{consumo.consumoDescripcion}</TableCell>
                   <TableCell className="hidden xl:table-cell">
                     <Badge variant="outline" className="text-xs">{consumo.categoria}</Badge>
@@ -111,20 +112,40 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                       </Badge>
                     ) : consumo.metodoPago ? (
                       <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">{consumo.metodoPago}</Badge>
-                        {/* ✅ NUEVO: Botón para ver comprobante de transferencia */}
+                        <Badge variant="secondary" className="text-xs whitespace-nowrap">{consumo.metodoPago}</Badge>
+                        {/* ✅ Botón para ver comprobante de transferencia */}
                         {consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante && (
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => {
                               setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
+                              setTipoComprobante('TRANSFERENCIA');
                               setComprobanteModalOpen(true);
                             }}
                             className="h-6 w-6 p-0"
-                            title="Ver comprobante"
+                            title="Ver comprobante de transferencia"
                           >
                             <FileImage className="h-4 w-4 text-blue-600" />
+                          </Button>
+                        )}
+                        {/* ✅ NUEVO: Botón para ver comprobante de tarjeta */}
+                        {consumo.metodoPago === 'TARJETA_CREDITO' && (consumo as any).datosTarjeta?.imagenComprobante && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              console.log('🖼️ CLICK TARJETA - Consumo completo:', consumo);
+                              console.log('🖼️ CLICK TARJETA - datosTarjeta:', (consumo as any).datosTarjeta);
+                              console.log('🖼️ CLICK TARJETA - imagenComprobante (primeros 100 chars):', (consumo as any).datosTarjeta.imagenComprobante?.substring(0, 100));
+                              setImagenComprobante((consumo as any).datosTarjeta.imagenComprobante);
+                              setTipoComprobante('TARJETA');
+                              setComprobanteModalOpen(true);
+                            }}
+                            className="h-6 w-6 p-0"
+                            title="Ver comprobante de posnet"
+                          >
+                            <FileImage className="h-4 w-4 text-purple-600" />
                           </Button>
                         )}
                       </div>
@@ -143,19 +164,23 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                           💰 Pagar
                         </Button>
                       )}
-                      {consumo.ticketId && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedTicketId(consumo.ticketId!);
-                            setTicketModalOpen(true);
-                          }}
-                          className="text-[10px] px-2 h-7 whitespace-nowrap"
-                        >
-                          <Receipt className="h-3 w-3" />
-                        </Button>
-                      )}
+                      {/* ✅ CORREGIDO: Solo mostrar botón de ticket si NO hay comprobante de tarjeta/transferencia */}
+                      {consumo.ticketId &&
+                        !(consumo.metodoPago === 'TARJETA_CREDITO' && (consumo as any).datosTarjeta?.imagenComprobante) &&
+                        !(consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedTicketId(consumo.ticketId!);
+                              setTicketModalOpen(true);
+                            }}
+                            className="text-[10px] px-2 h-7 whitespace-nowrap"
+                            title="Ver ticket de facturación"
+                          >
+                            <Receipt className="h-3 w-3" />
+                          </Button>
+                        )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -208,23 +233,25 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                 </div>
               </div>
 
-              {/* Botón Ver Ticket - Solo si tiene ticketId */}
-              {consumo.ticketId && (
-                <div className="pt-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedTicketId(consumo.ticketId!);
-                      setTicketModalOpen(true);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 h-8 text-xs"
-                  >
-                    <Receipt className="h-3.5 w-3.5" />
-                    Ver Ticket de Facturación
-                  </Button>
-                </div>
-              )}
+              {/* ✅ CORREGIDO: Botón Ver Ticket - Solo si NO hay comprobante de tarjeta/transferencia */}
+              {consumo.ticketId &&
+                !(consumo.metodoPago === 'TARJETA_CREDITO' && (consumo as any).datosTarjeta?.imagenComprobante) &&
+                !(consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante) && (
+                  <div className="pt-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedTicketId(consumo.ticketId!);
+                        setTicketModalOpen(true);
+                      }}
+                      className="w-full flex items-center justify-center gap-2 h-8 text-xs"
+                    >
+                      <Receipt className="h-3.5 w-3.5" />
+                      Ver Ticket de Facturación
+                    </Button>
+                  </div>
+                )}
 
               <div className="pt-2 border-t space-y-3">
                 <div className="flex justify-between items-center">
@@ -259,6 +286,7 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                         variant="secondary"
                         onClick={() => {
                           setImagenComprobante((consumo as any).datosTransferencia.imagenComprobante);
+                          setTipoComprobante('TRANSFERENCIA');
                           setComprobanteModalOpen(true);
                         }}
                         className="w-full flex items-center justify-center gap-2 bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/60"
@@ -282,8 +310,12 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                         size="sm"
                         variant="secondary"
                         onClick={() => {
+                          console.log('🖼️ MOBILE CLICK TARJETA - Consumo completo:', consumo);
+                          console.log('🖼️ MOBILE CLICK TARJETA - datosTarjeta:', (consumo as any).datosTarjeta);
                           const img = (consumo as any).datosTarjeta.imagenComprobante;
+                          console.log('🖼️ MOBILE CLICK TARJETA - imagen (primeros 100 chars):', img?.substring(0, 100));
                           setImagenComprobante(img);
+                          setTipoComprobante('TARJETA');
                           setComprobanteModalOpen(true);
                         }}
                         className="w-full flex items-center justify-center gap-2 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60"
@@ -352,19 +384,19 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
         ticketId={selectedTicketId}
       />
 
-      {/* ✅ Modal de Comprobante de Transferencia */}
+      {/* ✅ Modal de Comprobante (Transferencia o Tarjeta) */}
       <Dialog open={comprobanteModalOpen} onOpenChange={setComprobanteModalOpen}>
-        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] p-0 gap-0">
+        <DialogContent className="max-w-2xl w-[95vw] max-h-[90vh] p-0 gap-0 flex flex-col">
           <DialogHeader className="p-4 pb-3 border-b">
             <DialogTitle className="text-base font-semibold">
-              Comprobante de Transferencia
+              {tipoComprobante === 'TRANSFERENCIA' ? 'Comprobante de Transferencia' : 'Comprobante de Posnet'}
             </DialogTitle>
           </DialogHeader>
-          <div className="p-4 overflow-auto max-h-[calc(90vh-120px)]">
+          <div className="p-4 overflow-auto flex-1">
             <div className="bg-gray-100 dark:bg-gray-900 rounded-lg p-2 overflow-auto">
               <img
                 src={imagenComprobante}
-                alt="Comprobante de transferencia"
+                alt="Comprobante de pago"
                 className="w-full h-auto rounded"
               />
             </div>
