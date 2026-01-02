@@ -51,13 +51,13 @@ try {
     if ($tableExists) {
         $sql = "SELECT id, fecha, area, tipo, origen, descripcion, monto, metodo_pago 
                 FROM area_movements 
-                WHERE sincronizado = 0 AND user_id = :userId";
+                WHERE sincronizado = 0";
         if ($area) {
             $sql .= " AND area = :area";
         }
         
         $stmt = $pdo->prepare($sql);
-        $params = [':userId' => $userId];
+        $params = [];
         if ($area) $params[':area'] = $area;
         $stmt->execute($params);
         
@@ -80,13 +80,13 @@ try {
     $sql = "SELECT id, fecha, area, estado, consumo_descripcion, habitacion_cliente, 
                    total, metodo_pago 
             FROM wb_consumos 
-            WHERE sincronizado = 0 AND usuario_registro_id = :userId";
+            WHERE sincronizado = 0";
     if ($area) {
         $sql .= " AND area = :area";
     }
     
     $stmt = $pdo->prepare($sql);
-    $params = [':userId' => $userId];
+    $params = [];
     if ($area) $params[':area'] = $area;
     $stmt->execute($params);
     
@@ -113,13 +113,13 @@ try {
     // 1C. Gastos (wb_gastos)
     $sql = "SELECT id, fecha, area, descripcion, monto 
             FROM wb_gastos 
-            WHERE sincronizado = 0 AND user_id = :userId";
+            WHERE sincronizado = 0";
     if ($area) {
         $sql .= " AND area = :area";
     }
     
     $stmt = $pdo->prepare($sql);
-    $params = [':userId' => $userId];
+    $params = [];
     if ($area) $params[':area'] = $area;
     $stmt->execute($params);
     

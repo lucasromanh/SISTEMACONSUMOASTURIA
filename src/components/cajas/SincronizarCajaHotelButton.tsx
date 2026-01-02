@@ -15,7 +15,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Upload, CheckCircle, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/store/authStore';
-import { useCajasStore } from '@/store/consumosStore';
 import type { MovimientoCaja, DatosParaCajaHotel } from '@/types/cajas';
 import { formatCurrency, formatDate } from '@/utils/formatters';
 
@@ -102,35 +101,50 @@ export function SincronizarCajaHotelButton({ movimientos }: SincronizarCajaHotel
     setSincronizando(true);
 
     try {
-      // Aquí se implementará la conexión con el sistema de Caja del Hotel
-      // Por ahora, simulamos el proceso
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!user?.id) {
+        throw new Error('Usuario no identificado');
+      }
 
-      // TODO: Implementar llamada a API del sistema de Caja del Hotel
-      // const response = await fetch('URL_API_CAJA_HOTEL', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(datosParaSincronizar),
-      // });
+      // Llamar al endpoint de sincronización
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost/backend'}/sync_to_hotel_cash.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          // No enviamos área específica para sincronizar TODAS las áreas
+        }),
+      });
 
-      // Marcar los movimientos como sincronizados
-      const { marcarComoSincronizados } = useCajasStore.getState();
-      const idsASincronizar = movimientos
-        .filter(m => m.tipo === 'INGRESO' && !m.sincronizado)
-        .map(m => m.id);
-      marcarComoSincronizados(idsASincronizar);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Error en la sincronización');
+      }
 
       toast({
         title: '✅ Sincronización exitosa',
-        description: `${datosParaSincronizar.length} movimientos enviados a Caja del Hotel`,
+        description: `${result.synced} de ${result.total} movimientos sincronizados con Caja del Hotel`,
       });
 
+      // Mostrar errores si los hay
+      if (result.errors && result.errors.length > 0) {
+        console.warn('⚠️ Errores en sincronización:', result.errors);
+        toast({
+          variant: 'default',
+          title: '⚠️ Sincronización parcial',
+          description: `${result.errors.length} movimientos no se sincronizaron. Revisa la consola para más detalles.`,
+        });
+      }
+
       setOpen(false);
+
+      // Recargar movimientos para actualizar la vista
+      window.location.reload();
     } catch (error) {
       toast({
         variant: 'destructive',
         title: '❌ Error en sincronización',
-        description: 'No se pudo conectar con el sistema de Caja del Hotel',
+        description: error instanceof Error ? error.message : 'No se pudo conectar con el sistema de Caja del Hotel',
       });
     } finally {
       setSincronizando(false);
