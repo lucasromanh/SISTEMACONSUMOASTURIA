@@ -152,39 +152,49 @@ try {
             ];
         }
         
-        // Si tiene datos de tarjeta desde wb_consumos
-        if (!empty($row['consumo_datos_tarjeta'])) {
-            $consumo['datosTarjeta'] = json_decode($row['consumo_datos_tarjeta'], true);
-            
-            // 🔍 DEBUG: Ver qué hay en pago_imagen_tarjeta
-            $imagenLength = strlen($row['pago_imagen_tarjeta'] ?? '');
-            $debugMsg = "  → Consumo #{$row['id']} tiene consumo_datos_tarjeta, pago_imagen_tarjeta length: {$imagenLength}\n";
-            file_put_contents($debugFile, $debugMsg, FILE_APPEND);
-            
-            // ✅ PRIORIZAR imagen desde wb_consumo_pagos para tarjetas (comprobante del posnet)
-            if (!empty($row['pago_imagen_tarjeta'])) {
-                $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
-                file_put_contents($debugFile, "  → ✅ Imagen agregada desde pago_imagen_tarjeta\n", FILE_APPEND);
-                file_put_contents($debugFile, "  → DEBUG datosTarjeta keys: " . implode(', ', array_keys($consumo['datosTarjeta'])) . "\n", FILE_APPEND);
-                file_put_contents($debugFile, "  → DEBUG imagenComprobante existe en datosTarjeta: " . (isset($consumo['datosTarjeta']['imagenComprobante']) ? 'SI' : 'NO') . "\n", FILE_APPEND);
+        // ✅ CORREGIDO: Manejo de datos de tarjeta e imagen
+        // Primero verificar si hay datos de tarjeta en wb_consumos O en wb_consumo_pagos
+        $hasDatosTarjetaConsumo = !empty($row['consumo_datos_tarjeta']);
+        $hasDatosTarjetaPago = !empty($row['pago_datos_tarjeta']);
+        $hasImagenTarjeta = !empty($row['pago_imagen_tarjeta']);
+        
+        // 🔍 DEBUG
+        $debugMsg = "  → Consumo #{$row['id']} - Tarjeta check:\n";
+        $debugMsg .= "     consumo_datos_tarjeta: " . ($hasDatosTarjetaConsumo ? 'SI' : 'NO') . "\n";
+        $debugMsg .= "     pago_datos_tarjeta: " . ($hasDatosTarjetaPago ? 'SI' : 'NO') . "\n";
+        $debugMsg .= "     pago_imagen_tarjeta length: " . strlen($row['pago_imagen_tarjeta'] ?? '') . "\n";
+        file_put_contents($debugFile, $debugMsg, FILE_APPEND);
+        
+        if ($hasDatosTarjetaConsumo || $hasDatosTarjetaPago || $hasImagenTarjeta) {
+            // Priorizar datos de wb_consumos, luego de wb_consumo_pagos
+            if ($hasDatosTarjetaConsumo) {
+                $consumo['datosTarjeta'] = json_decode($row['consumo_datos_tarjeta'], true);
+                file_put_contents($debugFile, "     → Usando consumo_datos_tarjeta\n", FILE_APPEND);
+            } elseif ($hasDatosTarjetaPago) {
+                $consumo['datosTarjeta'] = json_decode($row['pago_datos_tarjeta'], true);
+                file_put_contents($debugFile, "     → Usando pago_datos_tarjeta\n", FILE_APPEND);
+            } else {
+                // Si solo hay imagen pero no datos, crear objeto vacío
+                $consumo['datosTarjeta'] = [];
+                file_put_contents($debugFile, "     → Creando datosTarjeta vacío para imagen\n", FILE_APPEND);
             }
-            // Solo usar consumo_imagen_comprobante si NO hay imagen en pagos (fallback)
+            
+            // ✅ SIEMPRE agregar imagen si existe en wb_consumo_pagos (tiene prioridad)
+            if ($hasImagenTarjeta) {
+                $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
+                file_put_contents($debugFile, "     → ✅ Imagen agregada desde pago_imagen_tarjeta\n", FILE_APPEND);
+            }
+            // Fallback: usar imagen de wb_consumos si existe
             elseif (!empty($row['consumo_imagen_comprobante'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['consumo_imagen_comprobante'];
-                file_put_contents($debugFile, "  → ✅ Imagen agregada desde consumo_imagen_comprobante\n", FILE_APPEND);
+                file_put_contents($debugFile, "     → ✅ Imagen agregada desde consumo_imagen_comprobante (fallback)\n", FILE_APPEND);
             } else {
-                file_put_contents($debugFile, "  → ⚠️ NO hay imagen disponible para tarjeta\n", FILE_APPEND);
+                file_put_contents($debugFile, "     → ⚠️ NO hay imagen disponible\n", FILE_APPEND);
             }
-        }
-        // Si no hay en consumos, buscar en pagos
-        elseif (!empty($row['pago_datos_tarjeta'])) {
-            $consumo['datosTarjeta'] = json_decode($row['pago_datos_tarjeta'], true);
-            $imagenLength = strlen($row['pago_imagen_tarjeta'] ?? '');
-            file_put_contents($debugFile, "  → Usando pago_datos_tarjeta, imagen length: {$imagenLength}\n", FILE_APPEND);
-            // Agregar imagen del comprobante desde wb_consumo_pagos si existe
-            if (!empty($row['pago_imagen_tarjeta'])) {
-                $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
-            }
+            
+            // 🔍 DEBUG final
+            $hasImagen = isset($consumo['datosTarjeta']['imagenComprobante']);
+            file_put_contents($debugFile, "     → FINAL: imagenComprobante en datosTarjeta: " . ($hasImagen ? 'SI' : 'NO') . "\n", FILE_APPEND);
         }
         
         // Remover campos temporales
@@ -208,6 +218,19 @@ try {
         $debugMsg .= "[ID:{$c['id']}, metodo:{$c['metodo_pago']}] ";
     }
     $debugMsg .= "\n";
+    
+    // 🔍 DEBUG ESPECÍFICO: Ver qué tiene cada consumo de tarjeta
+    foreach ($consumos as $c) {
+        if ($c['metodo_pago'] === 'TARJETA_CREDITO') {
+            $debugMsg .= "  → TARJETA ID {$c['id']}:\n";
+            $debugMsg .= "     tiene datosTarjeta: " . (isset($c['datosTarjeta']) ? 'SI' : 'NO') . "\n";
+            if (isset($c['datosTarjeta'])) {
+                $debugMsg .= "     datosTarjeta keys: " . implode(', ', array_keys($c['datosTarjeta'])) . "\n";
+                $debugMsg .= "     tiene imagenComprobante: " . (isset($c['datosTarjeta']['imagenComprobante']) ? 'SI (' . strlen($c['datosTarjeta']['imagenComprobante']) . ' chars)' : 'NO') . "\n";
+            }
+        }
+    }
+    
     file_put_contents($debugFile, $debugMsg, FILE_APPEND);
 
     echo json_encode([

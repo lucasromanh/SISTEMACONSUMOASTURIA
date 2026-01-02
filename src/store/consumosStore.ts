@@ -90,7 +90,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
 
       // Agregar movimiento de caja para todos los consumos
       const { addMovimiento } = useCajasStore.getState();
-      
+
       if (newConsumo.estado === 'PAGADO' && newConsumo.montoPagado) {
         // Consumo pagado inmediatamente
         // No registrar movimiento duplicado si ya se registró para transferencias en pagos parciales
@@ -172,24 +172,41 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
       });
 
       if (response.success && response.consumos) {
-        const consumosFormatted: Consumo[] = response.consumos.map((c) => ({
-          id: c.id.toString(),
-          fecha: c.fecha.split(' ')[0],
-          area: c.area as AreaConsumo,
-          habitacionOCliente: c.habitacion_cliente,
-          consumoDescripcion: c.consumo_descripcion,
-          categoria: c.categoria,
-          precioUnitario: c.precio_unitario,
-          cantidad: c.cantidad,
-          total: c.total,
-          estado: c.estado as 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL',
-          montoPagado: c.monto_pagado || null,
-          metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
-          usuarioRegistroId: c.usuario_registro_id.toString(),
-          ticketId: c.ticket_id || undefined,
-          datosTarjeta: c.datos_tarjeta,
-          imagenComprobante: c.imagen_comprobante,
-        }));
+        // 🔍 DEBUG: Ver qué llega del backend
+        console.log('📥 CONSUMOS RECIBIDOS DEL BACKEND:', response.consumos.length);
+
+        const consumosFormatted: Consumo[] = response.consumos.map((c) => {
+          // 🔍 DEBUG: Log para consumos con tarjeta
+          if (c.metodo_pago === 'TARJETA_CREDITO') {
+            console.log('💳 CONSUMO TARJETA COMPLETO:', c);
+            console.log('💳 datosTarjeta:', c.datosTarjeta);
+            console.log('💳 tieneImagen en datosTarjeta:', c.datosTarjeta?.imagenComprobante ? true : false);
+            console.log('💳 imagen_comprobante directo:', c.imagen_comprobante);
+          }
+
+          return {
+            id: c.id.toString(),
+            fecha: c.fecha.split(' ')[0],
+            area: c.area as AreaConsumo,
+            habitacionOCliente: c.habitacion_cliente,
+            consumoDescripcion: c.consumo_descripcion,
+            categoria: c.categoria,
+            precioUnitario: c.precio_unitario,
+            cantidad: c.cantidad,
+            total: c.total,
+            estado: c.estado as 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL',
+            montoPagado: c.monto_pagado || null,
+            metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
+            usuarioRegistroId: c.usuario_registro_id.toString(),
+            ticketId: c.ticket_id || undefined,
+            // ✅ CORREGIDO: El backend envía camelCase, no snake_case
+            datosTarjeta: c.datosTarjeta,  // Backend usa camelCase
+            datosTransferencia: c.datosTransferencia,  // Backend usa camelCase
+            imagenComprobante: c.imagen_comprobante,
+          };
+        });
+
+        console.log('📊 CONSUMOS FILTRADOS:', consumosFormatted.filter(c => c.metodoPago === 'TARJETA_CREDITO').length);
 
         set({ consumos: consumosFormatted });
       }

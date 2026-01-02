@@ -47,7 +47,9 @@ export interface ConsumoBackend {
     estado: string;
     monto_pagado: number | null;
     metodo_pago: string | null; // ✅ Agregado
-    datos_tarjeta?: any; // ✅ Datos de tarjeta
+    // ✅ BACKEND ENVÍA CAMELCASE (no snake_case)
+    datosTarjeta?: any; // ✅ Datos de tarjeta (camelCase desde backend)
+    datosTransferencia?: any; // ✅ Datos de transferencia (camelCase desde backend)
     imagen_comprobante?: string; // ✅ Imagen del comprobante
     usuario_registro_id: number;
     ticket_id: number | null;
