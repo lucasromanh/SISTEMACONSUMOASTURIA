@@ -233,25 +233,23 @@ export function ConsumosTable({ consumos }: ConsumosTableProps) {
                 </div>
               </div>
 
-              {/* ✅ CORREGIDO: Botón Ver Ticket - Solo si NO hay comprobante de tarjeta/transferencia */}
-              {consumo.ticketId &&
-                !(consumo.metodoPago === 'TARJETA_CREDITO' && (consumo as any).datosTarjeta?.imagenComprobante) &&
-                !(consumo.metodoPago === 'TRANSFERENCIA' && (consumo as any).datosTransferencia?.imagenComprobante) && (
-                  <div className="pt-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setSelectedTicketId(consumo.ticketId!);
-                        setTicketModalOpen(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 h-8 text-xs"
-                    >
-                      <Receipt className="h-3.5 w-3.5" />
-                      Ver Ticket de Facturación
-                    </Button>
-                  </div>
-                )}
+              {/* ✅ Botón Ver Ticket - SIEMPRE visible si existe ticketId */}
+              {consumo.ticketId && (
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedTicketId(consumo.ticketId!);
+                      setTicketModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 h-8 text-xs"
+                  >
+                    <Receipt className="h-3.5 w-3.5" />
+                    Ver Ticket de Facturación
+                  </Button>
+                </div>
+              )}
 
               <div className="pt-2 border-t space-y-3">
                 <div className="flex justify-between items-center">
