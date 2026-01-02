@@ -75,7 +75,7 @@ try {
     $sql = "SELECT c.id, c.fecha, c.area, c.habitacion_cliente, c.consumo_descripcion, 
                    c.categoria, c.precio_unitario, c.cantidad, c.total, c.estado,
                    c.monto_pagado, c.metodo_pago, c.usuario_registro_id, c.ticket_id,
-                   c.datos_tarjeta, c.imagen_comprobante, c.created_at,
+                   c.created_at,
                    u.username AS usuario_registro,
                    c.datos_tarjeta AS consumo_datos_tarjeta,
                    c.imagen_comprobante AS consumo_imagen_comprobante,
@@ -165,6 +165,8 @@ try {
             if (!empty($row['pago_imagen_tarjeta'])) {
                 $consumo['datosTarjeta']['imagenComprobante'] = $row['pago_imagen_tarjeta'];
                 file_put_contents($debugFile, "  → ✅ Imagen agregada desde pago_imagen_tarjeta\n", FILE_APPEND);
+                file_put_contents($debugFile, "  → DEBUG datosTarjeta keys: " . implode(', ', array_keys($consumo['datosTarjeta'])) . "\n", FILE_APPEND);
+                file_put_contents($debugFile, "  → DEBUG imagenComprobante existe en datosTarjeta: " . (isset($consumo['datosTarjeta']['imagenComprobante']) ? 'SI' : 'NO') . "\n", FILE_APPEND);
             }
             // Solo usar consumo_imagen_comprobante si NO hay imagen en pagos (fallback)
             elseif (!empty($row['consumo_imagen_comprobante'])) {
