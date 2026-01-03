@@ -91,7 +91,7 @@ export function AdminDashboardPage() {
       const total = areaConsumos.reduce((sum, c) => sum + c.total, 0);
       const totalPagado = areaConsumos
         .filter((c) => c.estado === 'PAGADO')
-        .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
+        .reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
       const totalHabitacion = areaConsumos
         .filter((c) => c.estado === 'CARGAR_HABITACION')
         .reduce((sum, c) => sum + c.total, 0);
@@ -111,7 +111,7 @@ export function AdminDashboardPage() {
 
     const totalPagado = consumos
       .filter((c) => c.estado === 'PAGADO')
-      .reduce((sum, c) => sum + (c.montoPagado || 0), 0);
+      .reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
 
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
