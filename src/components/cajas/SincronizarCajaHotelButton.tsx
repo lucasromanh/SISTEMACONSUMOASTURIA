@@ -105,8 +105,8 @@ export function SincronizarCajaHotelButton({ movimientos }: SincronizarCajaHotel
         throw new Error('Usuario no identificado');
       }
 
-      // Llamar al endpoint de sincronización
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost/backend'}/sync_to_hotel_cash.php`, {
+      // Llamar al endpoint de sincronización (usar ruta relativa para producción)
+      const response = await fetch('/process_integration.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
