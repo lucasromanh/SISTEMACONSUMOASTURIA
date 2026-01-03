@@ -22,6 +22,8 @@ import type { AreaConsumo, Consumo } from '@/types/consumos';
 interface EnviarCargosHabitacionButtonProps {
     variant?: 'default' | 'outline';
     area?: AreaConsumo;
+    startDate?: string;
+    endDate?: string;
 }
 
 interface DetalleHabitacion {
@@ -30,7 +32,7 @@ interface DetalleHabitacion {
     consumos: Consumo[];
 }
 
-export function EnviarCargosHabitacionButton({ variant = 'default', area }: EnviarCargosHabitacionButtonProps) {
+export function EnviarCargosHabitacionButton({ variant = 'default', area, startDate, endDate }: EnviarCargosHabitacionButtonProps) {
     const [open, setOpen] = useState(false);
     const [enviando, setEnviando] = useState(false);
     const [imagenGenerada, setImagenGenerada] = useState<string | null>(null);
@@ -39,7 +41,10 @@ export function EnviarCargosHabitacionButton({ variant = 'default', area }: Envi
     const { getConsumosByDateRange, loadConsumos } = useConsumosStore();
     const { toast } = useToast();
 
-    const { start, end } = getDateRangeByPeriod('day');
+    // Obtener rango de fechas (props o hoy por defecto)
+    const defaultRange = getDateRangeByPeriod('day');
+    const start = startDate || defaultRange.start;
+    const end = endDate || defaultRange.end;
 
     // Cargar consumos al abrir el modal
     useEffect(() => {

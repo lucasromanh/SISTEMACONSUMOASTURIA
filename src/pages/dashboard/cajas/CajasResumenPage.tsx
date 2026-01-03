@@ -9,6 +9,7 @@ import { IngresoInicialForm } from '@/components/cajas/IngresoInicialForm';
 import { ExportButtons } from '@/components/common/ExportButtons';
 import { SincronizarCajaHotelButton } from '@/components/cajas/SincronizarCajaHotelButton';
 import { CierreCajaButton } from '@/components/cajas/CierreCajaButton';
+import { EnviarCargosHabitacionButton } from '@/components/cajas/EnviarCargosHabitacionButton';
 import { useCajasStore, useConsumosStore } from '@/store/consumosStore';
 import { useAuthStore } from '@/store/authStore';
 import { getDateRangeByPeriod } from '@/utils/dateHelpers';
@@ -139,7 +140,16 @@ export function CajasResumenPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {user?.role === 'ADMIN' && <IngresoInicialForm />}
-          <CierreCajaButton area={area} />
+          <CierreCajaButton
+            area={area}
+            startDate={getDateRangeByPeriod(periodo).start}
+            endDate={getDateRangeByPeriod(periodo).end}
+          />
+          <EnviarCargosHabitacionButton
+            area={area}
+            startDate={getDateRangeByPeriod(periodo).start}
+            endDate={getDateRangeByPeriod(periodo).end}
+          />
           <Select value={periodo} onValueChange={(v) => setPeriodo(v as typeof periodo)}>
             <SelectTrigger className="w-[150px]">
               <SelectValue />
