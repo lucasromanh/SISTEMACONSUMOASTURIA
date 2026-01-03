@@ -125,6 +125,36 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // ✅ NUEVO: Obtener GASTOS (wb_gastos)
+    $sqlGastos = "SELECT g.id, g.fecha, g.area, g.descripcion, g.monto, g.created_at, u.username as usuario
+                  FROM wb_gastos g
+                  LEFT JOIN wb_users u ON u.id = g.user_id
+                  WHERE 1=1";
+    $paramsGastos = [];
+
+    if ($area !== '') {
+        $sqlGastos .= " AND g.area = :area";
+        $paramsGastos[':area'] = $area;
+    } elseif ($role !== 'ADMIN') {
+        $sqlGastos .= " AND g.area IN (SELECT area_code FROM wb_user_areas WHERE user_id = :uid)";
+        $paramsGastos[':uid'] = $userId;
+    }
+
+    if ($from !== '') {
+        $sqlGastos .= " AND g.fecha >= :from";
+        $paramsGastos[':from'] = $from;
+    }
+    if ($to !== '') {
+        $sqlGastos .= " AND g.fecha <= :to";
+        $paramsGastos[':to'] = $to;
+    }
+    
+    $sqlGastos .= " ORDER BY g.fecha DESC, g.id DESC";
+
+    $stmtGastos = $pdo->prepare($sqlGastos);
+    $stmtGastos->execute($paramsGastos);
+    $gastos = $stmtGastos->fetchAll(PDO::FETCH_ASSOC);
+
     // 🔍 DEBUG: Log de resultados obtenidos
     $debugMsg = date('Y-m-d H:i:s') . " - Filas obtenidas: " . count($rows) . "\n";
     file_put_contents($debugFile, $debugMsg, FILE_APPEND);
@@ -236,6 +266,7 @@ try {
     echo json_encode([
         'success'  => true,
         'consumos' => $consumos,
+        'gastos'   => $gastos
     ]);
 } catch (Throwable $e) {
     http_response_code(400);

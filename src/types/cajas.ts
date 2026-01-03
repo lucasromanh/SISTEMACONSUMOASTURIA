@@ -23,6 +23,7 @@ export interface MovimientoCaja {
     numeroOperacion?: string;
     imagenComprobante?: string; // Base64 de la imagen (opcional)
   };
+  usuario?: string; // Usuario que registró el movimiento
 }
 
 export interface DatosParaCajaHotel {

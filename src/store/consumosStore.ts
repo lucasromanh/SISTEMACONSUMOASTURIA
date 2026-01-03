@@ -176,14 +176,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         console.log('📥 CONSUMOS RECIBIDOS DEL BACKEND:', response.consumos.length);
 
         const consumosFormatted: Consumo[] = response.consumos.map((c) => {
-          // 🔍 DEBUG: Log para consumos con tarjeta
-          if (c.metodo_pago === 'TARJETA_CREDITO') {
-            console.log('💳 CONSUMO TARJETA COMPLETO:', c);
-            console.log('💳 datosTarjeta:', c.datosTarjeta);
-            console.log('💳 tieneImagen en datosTarjeta:', c.datosTarjeta?.imagenComprobante ? true : false);
-            console.log('💳 imagen_comprobante directo:', c.imagen_comprobante);
-          }
-
+          // ... (existing mapping code)
           return {
             id: c.id.toString(),
             fecha: c.fecha.split(' ')[0],
@@ -199,16 +192,62 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
             metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
             usuarioRegistroId: c.usuario_registro_id.toString(),
             ticketId: c.ticket_id || undefined,
-            // ✅ CORREGIDO: El backend envía camelCase, no snake_case
-            datosTarjeta: c.datosTarjeta,  // Backend usa camelCase
-            datosTransferencia: c.datosTransferencia,  // Backend usa camelCase
+            datosTarjeta: c.datosTarjeta,
+            datosTransferencia: c.datosTransferencia,
             imagenComprobante: c.imagen_comprobante,
           };
         });
 
-        console.log('📊 CONSUMOS FILTRADOS:', consumosFormatted.filter(c => c.metodoPago === 'TARJETA_CREDITO').length);
-
+        // ✅ ACTUALIZAR STORE DE CONSUMOS
         set({ consumos: consumosFormatted });
+
+        // ✅ ACTUALIZAR STORE DE CAJAS (MOVIMIENTOS)
+        // 1. Limpiar movimientos previos (o filtrar por fecha/área si quisiéramos ser más selectivos, 
+        // pero aquí estamos recargando todo el rango)
+        const { setMovimientos } = useCajasStore.getState();
+
+        const nuevosMovimientos: MovimientoCaja[] = [];
+
+        // 2. Convertir GASTOS a movimientos de EGRESO
+        if (response.gastos) {
+          response.gastos.forEach((g: any) => {
+            nuevosMovimientos.push({
+              id: `gasto-${g.id}`,
+              fecha: g.fecha,
+              area: g.area,
+              tipo: 'EGRESO',
+              origen: 'GASTO',
+              descripcion: g.descripcion,
+              monto: Number(g.monto),
+              usuario: g.usuario
+            });
+          });
+        }
+
+        // 3. Convertir CONSUMOS PAGADOS a movimientos de INGRESO
+        consumosFormatted.forEach(c => {
+          if (c.estado === 'PAGADO' && c.montoPagado) {
+            nuevosMovimientos.push({
+              id: `consumo-${c.id}`,
+              fecha: c.fecha,
+              area: c.area,
+              tipo: 'INGRESO',
+              origen: 'CONSUMO',
+              descripcion: `${c.consumoDescripcion} - ${c.habitacionOCliente}`,
+              monto: Number(c.montoPagado),
+              metodoPago: c.metodoPago || 'EFECTIVO',
+              sincronizado: false // Por defecto
+            });
+          }
+        });
+
+        // Reemplazar movimientos en el store
+        // Nota: Necesitamos agregar setMovimientos a la interfaz CajasStore
+        if (setMovimientos) {
+          setMovimientos(nuevosMovimientos);
+        } else {
+          console.warn('setMovimientos no existe en CajasStore');
+        }
       }
     } catch (error) {
       console.error('Error al cargar consumos:', error);
@@ -224,10 +263,15 @@ interface CajasStore {
   getMovimientosByDateRange: (startDate: string, endDate: string, area?: AreaConsumo) => MovimientoCaja[];
   marcarComoSincronizados: (ids: string[]) => void;
   loadMovimientos: (area?: AreaConsumo, startDate?: string, endDate?: string) => Promise<void>;
+  setMovimientos: (movimientos: MovimientoCaja[]) => void;
 }
 
 export const useCajasStore = create<CajasStore>((set, get) => ({
   movimientos: [],
+
+  setMovimientos: (nuevosMovimientos) => {
+    set({ movimientos: nuevosMovimientos });
+  },
 
   addMovimiento: (movimientoData) => {
     const newMovimiento: MovimientoCaja = {

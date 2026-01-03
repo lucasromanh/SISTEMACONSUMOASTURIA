@@ -59,6 +59,7 @@ export interface ConsumoBackend {
 export interface ListConsumosResponse {
     success: boolean;
     consumos: ConsumoBackend[];
+    gastos?: any[]; // ✅ Gastos incluidos en la respuesta
     message?: string;
 }
 

@@ -22,6 +22,8 @@ import type { AreaConsumo } from '@/types/consumos';
 interface CierreCajaButtonProps {
   variant?: 'default' | 'outline';
   area?: AreaConsumo;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface CargaHabitacion {
@@ -29,7 +31,7 @@ interface CargaHabitacion {
   total: number;
 }
 
-export function CierreCajaButton({ variant = 'default', area }: CierreCajaButtonProps) {
+export function CierreCajaButton({ variant = 'default', area, startDate, endDate }: CierreCajaButtonProps) {
   const [open, setOpen] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [imagenGenerada, setImagenGenerada] = useState<string | null>(null);
@@ -39,9 +41,11 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
   const { getConsumosByDateRange } = useConsumosStore();
   const { toast } = useToast();
 
-  // Obtener movimientos y consumos del día
-  const { start, end } = getDateRangeByPeriod('day');
-  const { loadMovimientos } = useCajasStore();
+  // Obtener rango de fechas (props o hoy por defecto)
+  const defaultRange = getDateRangeByPeriod('day');
+  const start = startDate || defaultRange.start;
+  const end = endDate || defaultRange.end;
+
   const { loadConsumos } = useConsumosStore();
 
   // ✅ Cargar datos al abrir el diálogo para asegurar que el reporte esté completo
@@ -52,10 +56,10 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
 
   useEffect(() => {
     if (open) {
-      loadMovimientos(area, start, end);
+      // Solo cargar consumos (que ahora incluye gastos/movimientos también)
       loadConsumos(area, start, end);
     }
-  }, [open, area, start, end, loadMovimientos, loadConsumos]);
+  }, [open, area, start, end, loadConsumos]);
 
   const movimientos = getMovimientosByDateRange(start, end, area);
   const consumos = getConsumosByDateRange(start, end, area);
@@ -155,7 +159,7 @@ export function CierreCajaButton({ variant = 'default', area }: CierreCajaButton
           consumosTarjeta.map(c => {
             const datos = c.datosTarjeta;
             return `  • ${formatCurrency(c.montoPagado || c.total)} - ${datos?.marcaTarjeta || 'N/A'} ${datos?.tipoTarjeta || ''}\n` +
-                   `    Aut: ${datos?.numeroAutorizacion || 'N/A'} | Cupón: ${datos?.numeroCupon || 'N/A'}`;
+              `    Aut: ${datos?.numeroAutorizacion || 'N/A'} | Cupón: ${datos?.numeroCupon || 'N/A'}`;
           }).join('\n')
           : ''
         ) +
