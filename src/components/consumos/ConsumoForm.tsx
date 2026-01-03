@@ -9,7 +9,7 @@ import { useConsumosStore } from '@/store/consumosStore';
 import { useAuthStore } from '@/store/authStore';
 import type { AreaConsumo, EstadoConsumo, MetodoPago } from '@/types/consumos';
 import { getTodayISO } from '@/utils/dateHelpers';
-import { ShoppingCart, Receipt, Calendar, Plus, AlertTriangle } from 'lucide-react';
+import { ShoppingCart, Receipt, Calendar, Plus, AlertTriangle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
@@ -117,13 +117,16 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
   const [mostrarConfirmCancelar, setMostrarConfirmCancelar] = useState(false);
   const [pedidoACancelar, setPedidoACancelar] = useState<string | null>(null);
 
+  // ✅ NUEVO: Estado para prevenir clics duplicados durante procesamiento
+  const [procesandoCierre, setProcesandoCierre] = useState<string | null>(null);
+
   // ✅ Validación defensiva: asegurar que productosPorCategoria es un objeto válido
-  const categoriasDisponibles = productosPorCategoria && typeof productosPorCategoria === 'object' 
+  const categoriasDisponibles = productosPorCategoria && typeof productosPorCategoria === 'object'
     ? Object.keys(productosPorCategoria).filter(cat => productosPorCategoria[cat]?.length > 0)
     : [];
-  
-  const productosDisponibles = categoria && productosPorCategoria && productosPorCategoria[categoria] 
-    ? productosPorCategoria[categoria] 
+
+  const productosDisponibles = categoria && productosPorCategoria && productosPorCategoria[categoria]
+    ? productosPorCategoria[categoria]
     : [];
 
   // Obtener pedido activo actual
@@ -294,268 +297,291 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
   // Procesar cierre de pedido (con o sin datos de transferencia/tarjeta)
   const procesarCierrePedido = async (datosComprobanteOTarjeta: any) => {
+    // ✅ PREVENIR CLICS DUPLICADOS: Marcar como procesando
+    if (procesandoCierre) {
+      toast({
+        variant: "destructive",
+        title: "⚠️ Ya se está procesando",
+        description: "Por favor espere a que termine el procesamiento actual",
+      });
+      return;
+    }
 
     const pedido = pedidosActivos.find(p => p.id === pedidoACerrar);
     if (!pedido) return;
 
+    // ✅ BLOQUEAR PROCESAMIENTO
+    setProcesandoCierre(pedidoACerrar);
 
-    const fechaActual = getTodayISO();
-    const totalPedido = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
-    let pagos: PagoRegistrado[] = pedido.pagos || [];
-    let montoPagadoAcumulado = pagos.reduce((sum: number, p: PagoRegistrado) => sum + p.monto, 0);
-    let estadoFinal: string = estado;
-    let montoPagadoTotal: number | null = null;
+    try {
+      const fechaActual = getTodayISO();
+      const totalPedido = pedido.productos.reduce((sum, p) => sum + p.subtotal, 0);
+      let pagos: PagoRegistrado[] = pedido.pagos || [];
+      let montoPagadoAcumulado = pagos.reduce((sum: number, p: PagoRegistrado) => sum + p.monto, 0);
+      let estadoFinal: string = estado;
+      let montoPagadoTotal: number | null = null;
 
-    // Si es transferencia, validar el monto y registrar pago parcial
-    if (datosComprobanteOTarjeta && metodoPago === 'TRANSFERENCIA') {
-      // Asegurar que el monto es número real, no string decimal
-      let montoTransferencia = parseMonto(datosComprobanteOTarjeta.monto);
-      // Registrar pago parcial en el array de pagos
-      const nuevoPago: PagoRegistrado = {
-        id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        fecha: fechaActual,
-        metodo: 'TRANSFERENCIA',
-        monto: montoTransferencia,
-        usuarioRegistroId: user?.id ? String(user.id) : '',
-        datosTransferencia: {
-          hora: datosComprobanteOTarjeta.hora,
-          aliasCbu: datosComprobanteOTarjeta.aliasCbu,
-          banco: datosComprobanteOTarjeta.banco,
-          numeroOperacion: datosComprobanteOTarjeta.numeroOperacion,
-          imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
-        },
-      };
-      pagos = [...pagos, nuevoPago];
-      montoPagadoAcumulado += montoTransferencia;
+      // Si es transferencia, validar el monto y registrar pago parcial
+      if (datosComprobanteOTarjeta && metodoPago === 'TRANSFERENCIA') {
+        // Asegurar que el monto es número real, no string decimal
+        let montoTransferencia = parseMonto(datosComprobanteOTarjeta.monto);
+        // Registrar pago parcial en el array de pagos
+        const nuevoPago: PagoRegistrado = {
+          id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          fecha: fechaActual,
+          metodo: 'TRANSFERENCIA',
+          monto: montoTransferencia,
+          usuarioRegistroId: user?.id ? String(user.id) : '',
+          datosTransferencia: {
+            hora: datosComprobanteOTarjeta.hora,
+            aliasCbu: datosComprobanteOTarjeta.aliasCbu,
+            banco: datosComprobanteOTarjeta.banco,
+            numeroOperacion: datosComprobanteOTarjeta.numeroOperacion,
+            imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
+          },
+        };
+        pagos = [...pagos, nuevoPago];
+        montoPagadoAcumulado += montoTransferencia;
 
-      // NOTA: El backend (create_consumo_pago.php) ya se encarga de crear
-      // el movimiento de caja automáticamente en syncPagoToAreaMovementsAndCaja
-      // por lo que NO necesitamos crearlo aquí
+        // NOTA: El backend (create_consumo_pago.php) ya se encarga de crear
+        // el movimiento de caja automáticamente en syncPagoToAreaMovementsAndCaja
+        // por lo que NO necesitamos crearlo aquí
 
-      if (montoPagadoAcumulado < totalPedido) {
-        // Pago parcial
-        estadoFinal = 'PAGO_PARCIAL';
-        montoPagadoTotal = montoPagadoAcumulado;
-        // Actualizar el pedido con los pagos acumulados
-        setPedidosActivos(pedidosActivos.map(p =>
-          p.id === pedidoACerrar ? { ...p, pagos, estado: estadoFinal, montoPagado: montoPagadoTotal ?? undefined } : p
-        ));
-        toast({
-          title: "💰 Pago parcial registrado",
-          description: `Se pagó $${montoPagadoAcumulado.toFixed(2)} de $${totalPedido.toFixed(2)}. Resta: $${(totalPedido - montoPagadoAcumulado).toFixed(2)}`,
-          variant: "default",
-        });
-        setMostrarModalCierre(false);
-        setPedidoACerrar(null);
-        return;
-      } else if (montoPagadoAcumulado > totalPedido) {
-        // Advertencia si paga de más
-        toast({
-          title: "⚠️ Monto mayor al total",
-          description: `Se transfirieron $${montoPagadoAcumulado.toFixed(2)} pero el total es $${totalPedido.toFixed(2)}`,
-          variant: "destructive",
-        });
-      } else {
-        // Pago completo con este último pago
+        if (montoPagadoAcumulado < totalPedido) {
+          // Pago parcial
+          estadoFinal = 'PAGO_PARCIAL';
+          montoPagadoTotal = montoPagadoAcumulado;
+          // Actualizar el pedido con los pagos acumulados
+          setPedidosActivos(pedidosActivos.map(p =>
+            p.id === pedidoACerrar ? { ...p, pagos, estado: estadoFinal, montoPagado: montoPagadoTotal ?? undefined } : p
+          ));
+          toast({
+            title: "💰 Pago parcial registrado",
+            description: `Se pagó $${montoPagadoAcumulado.toFixed(2)} de $${totalPedido.toFixed(2)}. Resta: $${(totalPedido - montoPagadoAcumulado).toFixed(2)}`,
+            variant: "default",
+          });
+          setMostrarModalCierre(false);
+          setPedidoACerrar(null);
+          return;
+        } else if (montoPagadoAcumulado > totalPedido) {
+          // Advertencia si paga de más
+          toast({
+            title: "⚠️ Monto mayor al total",
+            description: `Se transfirieron $${montoPagadoAcumulado.toFixed(2)} pero el total es $${totalPedido.toFixed(2)}`,
+            variant: "destructive",
+          });
+        } else {
+          // Pago completo con este último pago
+          estadoFinal = 'PAGADO';
+          montoPagadoTotal = montoPagadoAcumulado;
+        }
+      }
+
+      // Si es tarjeta de crédito, validar y registrar pago
+      if (datosComprobanteOTarjeta && metodoPago === 'TARJETA_CREDITO') {
+        // Para tarjeta, el monto es el total del pedido (no permite pagos parciales en este flujo)
+        const montoTarjeta = totalPedido;
+
+        const nuevoPago: PagoRegistrado = {
+          id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          fecha: fechaActual,
+          metodo: 'TARJETA_CREDITO',
+          monto: montoTarjeta,
+          usuarioRegistroId: user?.id ? String(user.id) : '',
+          datosTarjeta: {
+            cuotas: datosComprobanteOTarjeta.cuotas,
+            numeroAutorizacion: datosComprobanteOTarjeta.numeroAutorizacion,
+            tipoTarjeta: datosComprobanteOTarjeta.tipoTarjeta,
+            marcaTarjeta: datosComprobanteOTarjeta.marcaTarjeta,
+            numeroCupon: datosComprobanteOTarjeta.numeroCupon,
+            estado: 'APROBADO',
+            imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
+          },
+        };
+
+        pagos = [...pagos, nuevoPago];
+        montoPagadoAcumulado += montoTarjeta;
         estadoFinal = 'PAGADO';
         montoPagadoTotal = montoPagadoAcumulado;
       }
-    }
 
-    // Si es tarjeta de crédito, validar y registrar pago
-    if (datosComprobanteOTarjeta && metodoPago === 'TARJETA_CREDITO') {
-      // Para tarjeta, el monto es el total del pedido (no permite pagos parciales en este flujo)
-      const montoTarjeta = totalPedido;
-      
-      const nuevoPago: PagoRegistrado = {
-        id: `pago-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        fecha: fechaActual,
-        metodo: 'TARJETA_CREDITO',
-        monto: montoTarjeta,
-        usuarioRegistroId: user?.id ? String(user.id) : '',
-        datosTarjeta: {
-          cuotas: datosComprobanteOTarjeta.cuotas,
-          numeroAutorizacion: datosComprobanteOTarjeta.numeroAutorizacion,
-          tipoTarjeta: datosComprobanteOTarjeta.tipoTarjeta,
-          marcaTarjeta: datosComprobanteOTarjeta.marcaTarjeta,
-          numeroCupon: datosComprobanteOTarjeta.numeroCupon,
-          estado: 'APROBADO',
-          imagenComprobante: datosComprobanteOTarjeta.imagenComprobante,
-        },
-      };
-      
-      pagos = [...pagos, nuevoPago];
-      montoPagadoAcumulado += montoTarjeta;
-      estadoFinal = 'PAGADO';
-      montoPagadoTotal = montoPagadoAcumulado;
-    }
-
-    // Función auxiliar para registrar consumos (pagados o cargados a habitación)
-    const registrarConsumos = async (estadoAUsar: string, pagosParam: PagoRegistrado[], montoPagadoPorProducto?: number) => {
-      for (const producto of pedido.productos) {
-        // ✅ Determinar método de pago desde el array de pagos (fuente de verdad)
-        let metodoFinal: MetodoPago | undefined = undefined;
-        const pagosTarjeta = pagosParam.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
-        const pagosTransfer = pagosParam.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
-        
-        if (estadoAUsar === 'PAGADO') {
-          if (pagosTarjeta.length > 0) {
-            metodoFinal = 'TARJETA_CREDITO';
-          } else if (pagosTransfer.length > 0) {
-            metodoFinal = 'TRANSFERENCIA';
-          } else {
-            // Si no hay pagos en el array, usar el método del estado o EFECTIVO por defecto
-            metodoFinal = metodoPago || 'EFECTIVO';
-          }
-          
-          // 🐛 DEBUG: Verificar método de pago determinado
-          console.log('📋 Método de pago determinado:', {
-            metodoFinal,
-            pagosTarjeta: pagosTarjeta.length,
-            pagosTransfer: pagosTransfer.length,
-            metodoPagoState: metodoPago,
-            totalPagos: pagosParam.length
-          });
-        }
-        
-        const consumoData: any = {
-          fecha: fechaActual,
-          area,
-          habitacionOCliente,
-          consumoDescripcion: producto.nombre,
-          categoria: producto.categoria,
-          precioUnitario: producto.precioUnitario,
-          cantidad: producto.cantidad,
-          total: producto.subtotal,
-          estado: estadoAUsar,
-          montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
-          metodoPago: metodoFinal,
-          usuarioRegistroId: user?.id ? String(user.id) : '',
-          ticketId: pedido.ticketId, // Vincular consumo con ticket
-          pagos: pagosParam,
-        };
-        // Si hubo pagos con transferencia o tarjeta, pasar los datos
-        if (pagosParam && pagosParam.length > 0) {
+      // Función auxiliar para registrar consumos (pagados o cargados a habitación)
+      const registrarConsumos = async (estadoAUsar: string, pagosParam: PagoRegistrado[], montoPagadoPorProducto?: number) => {
+        for (const producto of pedido.productos) {
+          // ✅ Determinar método de pago desde el array de pagos (fuente de verdad)
+          let metodoFinal: MetodoPago | undefined = undefined;
+          const pagosTarjeta = pagosParam.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
           const pagosTransfer = pagosParam.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
-          if (pagosTransfer.length > 0) {
-            const datosTransfer = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
-            consumoData.datosTransferencia = datosTransfer;
-            // ✅ Asegurar que la imagen de transferencia también se envíe
-            if (datosTransfer?.imagenComprobante && !consumoData.imagenComprobante) {
-              consumoData.imagenComprobante = datosTransfer.imagenComprobante;
+
+          if (estadoAUsar === 'PAGADO') {
+            if (pagosTarjeta.length > 0) {
+              metodoFinal = 'TARJETA_CREDITO';
+            } else if (pagosTransfer.length > 0) {
+              metodoFinal = 'TRANSFERENCIA';
+            } else {
+              // Si no hay pagos en el array, usar el método del estado o EFECTIVO por defecto
+              metodoFinal = metodoPago || 'EFECTIVO';
             }
+
+            // 🐛 DEBUG: Verificar método de pago determinado
+            console.log('📋 Método de pago determinado:', {
+              metodoFinal,
+              pagosTarjeta: pagosTarjeta.length,
+              pagosTransfer: pagosTransfer.length,
+              metodoPagoState: metodoPago,
+              totalPagos: pagosParam.length
+            });
           }
-          
-          if (pagosTarjeta.length > 0) {
-            const datosTarjetaPago = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
-            // Extraer imagen_comprobante como campo separado
-            if (datosTarjetaPago) {
-              const { imagenComprobante, ...datosTarjetaSinImagen } = datosTarjetaPago;
-              consumoData.datosTarjeta = datosTarjetaSinImagen;
-              if (imagenComprobante) {
-                consumoData.imagenComprobante = imagenComprobante;
+
+          const consumoData: any = {
+            fecha: fechaActual,
+            area,
+            habitacionOCliente,
+            consumoDescripcion: producto.nombre,
+            categoria: producto.categoria,
+            precioUnitario: producto.precioUnitario,
+            cantidad: producto.cantidad,
+            total: producto.subtotal,
+            estado: estadoAUsar,
+            montoPagado: estadoAUsar === 'PAGADO' ? (montoPagadoPorProducto ?? producto.subtotal) : undefined,
+            metodoPago: metodoFinal,
+            usuarioRegistroId: user?.id ? String(user.id) : '',
+            ticketId: pedido.ticketId, // Vincular consumo con ticket
+            pagos: pagosParam,
+          };
+          // Si hubo pagos con transferencia o tarjeta, pasar los datos
+          if (pagosParam && pagosParam.length > 0) {
+            const pagosTransfer = pagosParam.filter(p => p.metodo === 'TRANSFERENCIA' && p.datosTransferencia);
+            if (pagosTransfer.length > 0) {
+              const datosTransfer = pagosTransfer[pagosTransfer.length - 1].datosTransferencia;
+              consumoData.datosTransferencia = datosTransfer;
+              // ✅ Asegurar que la imagen de transferencia también se envíe
+              if (datosTransfer?.imagenComprobante && !consumoData.imagenComprobante) {
+                consumoData.imagenComprobante = datosTransfer.imagenComprobante;
+              }
+            }
+
+            if (pagosTarjeta.length > 0) {
+              const datosTarjetaPago = pagosTarjeta[pagosTarjeta.length - 1].datosTarjeta;
+              // Extraer imagen_comprobante como campo separado
+              if (datosTarjetaPago) {
+                const { imagenComprobante, ...datosTarjetaSinImagen } = datosTarjetaPago;
+                consumoData.datosTarjeta = datosTarjetaSinImagen;
+                if (imagenComprobante) {
+                  consumoData.imagenComprobante = imagenComprobante;
+                }
               }
             }
           }
+
+          // ✅ DEBUG: Verificar datos antes de enviar
+          console.log('📤 Enviando consumo:', {
+            metodoPago: consumoData.metodoPago,
+            estado: consumoData.estado,
+            tieneDatosTarjeta: !!consumoData.datosTarjeta,
+            tieneImagenComprobante: !!consumoData.imagenComprobante,
+            tieneDatosTransferencia: !!consumoData.datosTransferencia
+          });
+
+          await addConsumo(consumoData);
         }
-        
-        // ✅ DEBUG: Verificar datos antes de enviar
-        console.log('📤 Enviando consumo:', {
-          metodoPago: consumoData.metodoPago,
-          estado: consumoData.estado,
-          tieneDatosTarjeta: !!consumoData.datosTarjeta,
-          tieneImagenComprobante: !!consumoData.imagenComprobante,
-          tieneDatosTransferencia: !!consumoData.datosTransferencia
+      };
+
+      // Cerrar ticket en el backend
+      const cerrarTicket = async () => {
+        if (!pedido.ticketId || !user) return;
+
+        // ✅ Determinar el método de pago desde el array de pagos
+        let metodoReal: MetodoPago = 'EFECTIVO';
+        if (pagos && pagos.length > 0) {
+          const ultimoPago = pagos[pagos.length - 1];
+          metodoReal = ultimoPago.metodo;
+        } else {
+          metodoReal = metodoPago || 'EFECTIVO';
+        }
+
+        console.log('🎫 Cerrando ticket:', {
+          ticketId: pedido.ticketId,
+          metodoReal,
+          totalEfectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
+          totalTransferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
+          totalTarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
         });
-        
-        await addConsumo(consumoData);
-      }
-    };
 
-    // Cerrar ticket en el backend
-    const cerrarTicket = async () => {
-      if (!pedido.ticketId || !user) return;
+        try {
+          await ticketsService.closeTicket({
+            user_id: user.id,
+            ticket_id: pedido.ticketId,
+            fecha_cierre: new Date().toISOString(),
+            total_efectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
+            total_transferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
+            total_tarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
+            total_habitacion: estadoFinal === 'CARGAR_HABITACION' ? totalPedido : 0,
+            notas_cierre: `Hab/Cliente: ${habitacionOCliente}`,
+          });
+        } catch (error) {
+          console.error('Error al cerrar ticket:', error);
+        }
+      };
 
-      // ✅ Determinar el método de pago desde el array de pagos
-      let metodoReal: MetodoPago = 'EFECTIVO';
-      if (pagos && pagos.length > 0) {
-        const ultimoPago = pagos[pagos.length - 1];
-        metodoReal = ultimoPago.metodo;
+      // Registrar consumos si está PAGADO o si se debe cargar a habitación
+      if (estadoFinal === 'PAGADO') {
+        await registrarConsumos('PAGADO', pagos);
+        await cerrarTicket(); // Cerrar ticket en BD
+        // ✅ Recargar consumos del día para actualizar la vista
+        const fechaISO = getTodayISO();
+        await loadConsumos(area, fechaISO, fechaISO);
+        // Remover pedido y cerrar modal
+        setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+        if (pedidoSeleccionado === pedidoACerrar) {
+          setPedidoSeleccionado(null);
+        }
+        setMostrarModalCierre(false);
+        setPedidoACerrar(null);
+        toast({
+          title: "✅ Pedido cerrado exitosamente",
+          description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
+        });
+      } else if (estadoFinal === 'CARGAR_HABITACION') {
+        // Registrar consumos con estado cargado a habitación
+        await registrarConsumos('CARGAR_HABITACION', []);
+        await cerrarTicket(); // Cerrar ticket en BD
+        // ✅ Recargar consumos del día para actualizar la vista
+        const fechaISO = getTodayISO();
+        await loadConsumos(area, fechaISO, fechaISO);
+        setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+        if (pedidoSeleccionado === pedidoACerrar) {
+          setPedidoSeleccionado(null);
+        }
+        setMostrarModalCierre(false);
+        setPedidoACerrar(null);
+        toast({
+          title: "✅ Pedido cargado a habitación",
+          description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} cargado${pedido.productos.length !== 1 ? 's' : ''}`,
+        });
+      } else if (estadoFinal === 'PAGO_PARCIAL') {
+        // Si es pago parcial, solo cerrar el modal (los pagos parciales ya fueron registrados como movimientos)
+        setMostrarModalCierre(false);
+        setPedidoACerrar(null);
       } else {
-        metodoReal = metodoPago || 'EFECTIVO';
+        // Otros estados: remover pedido y cerrar modal por seguridad
+        setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
+        if (pedidoSeleccionado === pedidoACerrar) {
+          setPedidoSeleccionado(null);
+        }
+        setMostrarModalCierre(false);
+        setPedidoACerrar(null);
       }
-
-      console.log('🎫 Cerrando ticket:', {
-        ticketId: pedido.ticketId,
-        metodoReal,
-        totalEfectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
-        totalTransferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
-        totalTarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
-      });
-
-      try {
-        await ticketsService.closeTicket({
-          user_id: user.id,
-          ticket_id: pedido.ticketId,
-          fecha_cierre: new Date().toISOString(),
-          total_efectivo: metodoReal === 'EFECTIVO' ? totalPedido : 0,
-          total_transferencia: metodoReal === 'TRANSFERENCIA' ? totalPedido : 0,
-          total_tarjeta: metodoReal === 'TARJETA_CREDITO' ? totalPedido : 0,
-          total_habitacion: estadoFinal === 'CARGAR_HABITACION' ? totalPedido : 0,
-          notas_cierre: `Hab/Cliente: ${habitacionOCliente}`,
-        });
-      } catch (error) {
-        console.error('Error al cerrar ticket:', error);
-      }
-    };
-
-    // Registrar consumos si está PAGADO o si se debe cargar a habitación
-    if (estadoFinal === 'PAGADO') {
-      await registrarConsumos('PAGADO', pagos);
-      await cerrarTicket(); // Cerrar ticket en BD
-      // ✅ Recargar consumos del día para actualizar la vista
-      const fechaISO = getTodayISO();
-      await loadConsumos(area, fechaISO, fechaISO);
-      // Remover pedido y cerrar modal
-      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-      if (pedidoSeleccionado === pedidoACerrar) {
-        setPedidoSeleccionado(null);
-      }
-      setMostrarModalCierre(false);
-      setPedidoACerrar(null);
+    } catch (error) {
+      console.error('Error procesando cierre:', error);
       toast({
-        title: "✅ Pedido cerrado exitosamente",
-        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} registrado${pedido.productos.length !== 1 ? 's' : ''}`,
+        variant: "destructive",
+        title: "❌ Error",
+        description: "Error al procesar el cierre del pedido",
       });
-    } else if (estadoFinal === 'CARGAR_HABITACION') {
-      // Registrar consumos con estado cargado a habitación
-      await registrarConsumos('CARGAR_HABITACION', []);
-      await cerrarTicket(); // Cerrar ticket en BD
-      // ✅ Recargar consumos del día para actualizar la vista
-      const fechaISO = getTodayISO();
-      await loadConsumos(area, fechaISO, fechaISO);
-      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-      if (pedidoSeleccionado === pedidoACerrar) {
-        setPedidoSeleccionado(null);
-      }
-      setMostrarModalCierre(false);
-      setPedidoACerrar(null);
-      toast({
-        title: "✅ Pedido cargado a habitación",
-        description: `${pedido.productos.length} producto${pedido.productos.length !== 1 ? 's' : ''} cargado${pedido.productos.length !== 1 ? 's' : ''}`,
-      });
-    } else if (estadoFinal === 'PAGO_PARCIAL') {
-      // Si es pago parcial, solo cerrar el modal (los pagos parciales ya fueron registrados como movimientos)
-      setMostrarModalCierre(false);
-      setPedidoACerrar(null);
-    } else {
-      // Otros estados: remover pedido y cerrar modal por seguridad
-      setPedidosActivos(pedidosActivos.filter(p => p.id !== pedidoACerrar));
-      if (pedidoSeleccionado === pedidoACerrar) {
-        setPedidoSeleccionado(null);
-      }
-      setMostrarModalCierre(false);
-      setPedidoACerrar(null);
+    } finally {
+      // ✅ LIBERAR BLOQUEO
+      setProcesandoCierre(null);
     }
   };
 
@@ -702,10 +728,17 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
                               e.stopPropagation();
                               handleAbrirModalCierre(pedido.id);
                             }}
-                            disabled={pedido.productos.length === 0}
+                            disabled={pedido.productos.length === 0 || procesandoCierre === pedido.id}
                             className="h-8 text-xs bg-green-600 hover:bg-green-700 disabled:opacity-50"
                           >
-                            💰 Cobrar
+                            {procesandoCierre === pedido.id ? (
+                              <>
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                Procesando...
+                              </>
+                            ) : (
+                              <>💰 Cobrar</>
+                            )}
                           </Button>
                           <Button
                             type="button"

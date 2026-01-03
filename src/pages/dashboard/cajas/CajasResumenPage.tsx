@@ -62,30 +62,41 @@ export function CajasResumenPage() {
   const resumen = useMemo(() => {
     console.log('📊 RESUMEN - Total movimientos:', movimientos.length);
     console.log('📊 RESUMEN - Total consumos:', consumos.length);
-    
+
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 
     console.log('📊 RESUMEN - Ingresos:', ingresos.length, 'Egresos:', egresos.length);
 
-    // Incluye todos los ingresos en efectivo (consumos + ingresos iniciales)
-    const totalIngresosEfectivo = ingresos
-      .filter((m) => m.metodoPago === 'EFECTIVO' || m.origen === 'INICIAL')
-      .reduce((sum, m) => sum + Number(m.monto), 0);
+    // ✅ CORREGIDO: Ingreso inicial desde movimientos + Consumos pagados en efectivo
+    const ingresoInicial = ingresos
+      .filter((m) => m.origen === 'INICIAL')
+      .reduce((sum, m) => sum + Number(m.monto || 0), 0);
 
-    const totalIngresosTransferencia = ingresos
-      .filter((m) => m.metodoPago === 'TRANSFERENCIA')
-      .reduce((sum, m) => sum + Number(m.monto), 0);
+    const consumosEfectivo = consumos.filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'EFECTIVO');
+    console.log('💵 CONSUMOS EFECTIVO:', consumosEfectivo.length, consumosEfectivo);
 
-    // ✅ CORREGIDO: Obtener ingresos de tarjeta desde CONSUMOS, no desde movimientos
+    const ventasEfectivo = consumosEfectivo.reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
+
+    const totalIngresosEfectivo = ingresoInicial + ventasEfectivo;
+
+    // ✅ CORREGIDO: Obtener transferencias desde CONSUMOS, no desde movimientos
+    const consumosTransferencia = consumos.filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TRANSFERENCIA');
+    console.log('🏦 CONSUMOS TRANSFERENCIA:', consumosTransferencia.length, consumosTransferencia);
+
+    const totalIngresosTransferencia = consumosTransferencia.reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
+
+    // ✅ MANTENER: Obtener ingresos de tarjeta desde CONSUMOS (ya estaba correcto)
     const consumosTarjeta = consumos.filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO');
     console.log('💳 CONSUMOS TARJETA:', consumosTarjeta.length, consumosTarjeta);
-    
-    const totalIngresosTarjeta = consumosTarjeta.reduce((sum, c) => sum + Number(c.montoPagado || c.total), 0);
 
-    const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto), 0);
+    const totalIngresosTarjeta = consumosTarjeta.reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
+
+    const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto || 0), 0);
 
     console.log('📊 TOTALES:', {
+      ingresoInicial,
+      ventasEfectivo,
       efectivo: totalIngresosEfectivo,
       transferencia: totalIngresosTransferencia,
       tarjeta: totalIngresosTarjeta,
