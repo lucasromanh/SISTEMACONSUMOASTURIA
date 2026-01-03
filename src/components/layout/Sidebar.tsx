@@ -9,7 +9,8 @@ import {
   Package,
   Receipt,
   Users,
-  ShoppingCart
+  ShoppingCart,
+  Copy
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/authStore';
@@ -87,6 +88,12 @@ const adminNavItems: NavItem[] = [
     title: 'Productos',
     href: '/dashboard/admin/products',
     icon: ShoppingCart,
+    roles: ['ADMIN'],
+  },
+  {
+    title: 'Duplicados',
+    href: '/dashboard/admin/duplicates',
+    icon: Copy,
     roles: ['ADMIN'],
   },
 ];

@@ -14,6 +14,7 @@ import { StockPage } from '@/pages/dashboard/stock/StockPage';
 import { GastosPage } from '@/pages/dashboard/stock/GastosPage';
 import { AdminUsersPage } from '@/pages/admin/AdminUsersPage';
 import { AdminProductsPage } from '@/pages/admin/AdminProductsPage';
+import { AdminDuplicateManagementPage } from '@/pages/admin/AdminDuplicateManagementPage';
 import { Loader2 } from 'lucide-react';
 import type { UserRole } from '@/types/auth';
 
@@ -154,6 +155,14 @@ export function AppRouter() {
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminProductsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/admin/duplicates"
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminDuplicateManagementPage />
               </ProtectedRoute>
             }
           />
