@@ -3,6 +3,7 @@ import type { Consumo, AreaConsumo } from '@/types/consumos';
 import type { MovimientoCaja } from '@/types/cajas';
 import { consumosService } from '@/services/consumos.service';
 import { useAuthStore } from './authStore';
+import { movimientosService } from '@/services/movimientos.service';
 
 interface ConsumosStore {
   consumos: Consumo[];
@@ -201,53 +202,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
         // ✅ ACTUALIZAR STORE DE CONSUMOS
         set({ consumos: consumosFormatted });
 
-        // ✅ ACTUALIZAR STORE DE CAJAS (MOVIMIENTOS)
-        // 1. Limpiar movimientos previos (o filtrar por fecha/área si quisiéramos ser más selectivos, 
-        // pero aquí estamos recargando todo el rango)
-        const { setMovimientos } = useCajasStore.getState();
 
-        const nuevosMovimientos: MovimientoCaja[] = [];
-
-        // 2. Convertir GASTOS a movimientos de EGRESO
-        if (response.gastos) {
-          response.gastos.forEach((g: any) => {
-            nuevosMovimientos.push({
-              id: `gasto-${g.id}`,
-              fecha: g.fecha,
-              area: g.area,
-              tipo: 'EGRESO',
-              origen: 'GASTO',
-              descripcion: g.descripcion,
-              monto: Number(g.monto),
-              usuario: g.usuario
-            });
-          });
-        }
-
-        // 3. Convertir CONSUMOS PAGADOS a movimientos de INGRESO
-        consumosFormatted.forEach(c => {
-          if (c.estado === 'PAGADO' && c.montoPagado) {
-            nuevosMovimientos.push({
-              id: `consumo-${c.id}`,
-              fecha: c.fecha,
-              area: c.area,
-              tipo: 'INGRESO',
-              origen: 'CONSUMO',
-              descripcion: `${c.consumoDescripcion} - ${c.habitacionOCliente}`,
-              monto: Number(c.montoPagado),
-              metodoPago: c.metodoPago || 'EFECTIVO',
-              sincronizado: false // Por defecto
-            });
-          }
-        });
-
-        // Reemplazar movimientos en el store
-        // Nota: Necesitamos agregar setMovimientos a la interfaz CajasStore
-        if (setMovimientos) {
-          setMovimientos(nuevosMovimientos);
-        } else {
-          console.warn('setMovimientos no existe en CajasStore');
-        }
       }
     } catch (error) {
       console.error('Error al cargar consumos:', error);
@@ -315,9 +270,35 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
 
   loadMovimientos: async (area, startDate, endDate) => {
     try {
-      // Los movimientos se generan automáticamente desde consumos y gastos
-      // Este método está disponible para futuras implementaciones si se necesita cargar desde backend
-      console.log('loadMovimientos llamado - área:', area, 'desde:', startDate, 'hasta:', endDate);
+      console.log('🔄 Cargando movimientos reales desde backend:', { area, startDate, endDate });
+      const user = useAuthStore.getState().user;
+
+      const response = await movimientosService.listMovimientos({
+        user_id: user?.id,
+        area,
+        from: startDate,
+        to: endDate
+      });
+
+      if (response.success && response.movements) {
+        console.log('📥 Movimientos recibidos:', response.movements.length);
+
+        const nuevosMovimientos: MovimientoCaja[] = response.movements.map((m: any) => ({
+          id: m.id?.toString() || `mov-${Math.random()}`,
+          fecha: m.fecha,
+          area: m.area as AreaConsumo,
+          tipo: m.tipo,
+          origen: m.origen as 'CONSUMO' | 'GASTO' | 'INICIAL' | 'TRANSFERENCIA' | 'AJUSTE',
+          descripcion: m.descripcion,
+          monto: Number(m.monto),
+          metodoPago: (m.metodo_pago as any) || undefined,
+          usuario: user?.username, // Usar username
+          sincronizado: m.sincronizado || false,
+          fechaSincronizacion: m.fecha_sincronizacion
+        }));
+
+        set({ movimientos: nuevosMovimientos });
+      }
     } catch (error) {
       console.error('Error al cargar movimientos:', error);
     }
