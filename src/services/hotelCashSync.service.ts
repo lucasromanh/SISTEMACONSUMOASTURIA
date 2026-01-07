@@ -49,7 +49,7 @@ export const hotelCashSyncService = {
 
     // Sincronizar al sistema externo
     syncToHotelCash: async (params: { user_id: number; area?: string }): Promise<SyncResponse> => {
-        const res = await fetch(`${API_URL}/sync_to_hotel_cash.php`, {
+        const res = await fetch(`${API_URL}/process_integration.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(params)

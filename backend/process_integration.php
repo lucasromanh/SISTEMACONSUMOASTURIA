@@ -36,10 +36,10 @@ try {
     }
 
     // Obtener información del usuario
-    $stmtUser = $pdo->prepare("SELECT name FROM wb_users WHERE id = :id");
+    $stmtUser = $pdo->prepare("SELECT username FROM wb_users WHERE id = :id");
     $stmtUser->execute([':id' => $userId]);
     $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
-    $username = $user['name'] ?? 'Sistema';
+    $username = $user['username'] ?? 'Sistema';
 
     // === 1. OBTENER MOVIMIENTOS NO SINCRONIZADOS ===
     $allMovements = [];
