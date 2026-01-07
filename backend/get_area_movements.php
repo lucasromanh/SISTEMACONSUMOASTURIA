@@ -42,6 +42,7 @@ try {
     ";
 
     // Construir query para consumos
+    // ✅ EVITAR DUPLICADOS: Si ya existe en area_movements, NO lo mostramos de nuevo
     $consumosQuery = "
         SELECT 
             id,
@@ -57,8 +58,12 @@ try {
             sincronizado,
             fecha_sincronizacion,
             'C' as source
-        FROM wb_consumos
+        FROM wb_consumos c
         WHERE 1=1
+        AND NOT EXISTS (
+            SELECT 1 FROM area_movements am 
+            WHERE am.descripcion LIKE CONCAT('%(Consumo #', c.id, ')%')
+        )
     ";
 
     // Construir query para gastos (como movimientos EGRESO)

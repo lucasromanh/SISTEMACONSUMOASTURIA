@@ -27,6 +27,12 @@ function getRequestData() {
 }
 
 try {
+    // === DEBUG LOGGING ===
+    $debugFile = __DIR__ . '/debug_sync.txt';
+    $log = function($msg) use ($debugFile) {
+        file_put_contents($debugFile, date('Y-m-d H:i:s') . " - $msg\n", FILE_APPEND);
+    };
+
     $data = getRequestData();
     $userId = (int)($data['user_id'] ?? 0);
     $area = isset($data['area']) ? trim($data['area']) : null;
@@ -41,7 +47,7 @@ try {
     $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
     $username = $user['username'] ?? 'Sistema';
 
-    // === 1. OBTENER MOVIMIENTOS NO SINCRONIZADOS ===
+    // 44: === 1. OBTENER MOVIMIENTOS NO SINCRONIZADOS ===
     $allMovements = [];
     
     // 1A. Movimientos de caja (area_movements)
@@ -56,12 +62,18 @@ try {
             $sql .= " AND area = :area";
         }
         
+        $log("Query 1A (Movements): $sql");
+        if($area) $log("Params: area=$area");
+
         $stmt = $pdo->prepare($sql);
         $params = [];
         if ($area) $params[':area'] = $area;
         $stmt->execute($params);
         
-        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $log("Filas encontradas en 1A: " . count($rows));
+
+        foreach ($rows as $row) {
             $allMovements[] = [
                 'source' => 'area_movements',
                 'id' => $row['id'],
@@ -76,21 +88,33 @@ try {
         }
     }
 
-    // 1B. Consumos (wb_consumos) - TODOS incluyendo CARGAR_HABITACION
-    $sql = "SELECT id, fecha, area, estado, consumo_descripcion, habitacion_cliente, 
-                   total, metodo_pago 
-            FROM wb_consumos 
-            WHERE sincronizado = 0";
+    // 1B. Consumos (wb_consumos)
+    // ✅ EVITAR DUPLICADOS: Si ya existe en area_movements (por el nuevo create_consumo), NO lo enviamos de nuevo
+    $sql = "SELECT c.id, c.fecha, c.area, c.estado, c.consumo_descripcion, c.habitacion_cliente, 
+                   c.total, c.metodo_pago 
+            FROM wb_consumos c
+            WHERE c.sincronizado = 0 
+            AND NOT EXISTS (
+                SELECT 1 FROM area_movements am 
+                WHERE am.descripcion LIKE CONCAT('%(Consumo #', c.id, ')%')
+            )";
+    
     if ($area) {
-        $sql .= " AND area = :area";
+        $sql .= " AND c.area = :area";
     }
     
+    $log("Query 1B (Consumos): $sql");
+    if($area) $log("Params: area=$area");
+
     $stmt = $pdo->prepare($sql);
     $params = [];
     if ($area) $params[':area'] = $area;
     $stmt->execute($params);
     
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $log("Filas encontradas en 1B: " . count($rows));
+
+    foreach ($rows as $row) {
         $tipo = ($row['estado'] === 'PAGADO') ? 'INGRESO' : 'EGRESO';
         $descripcion = $row['consumo_descripcion'];
         if ($row['habitacion_cliente']) {
@@ -109,6 +133,18 @@ try {
             'metodo_pago' => $row['metodo_pago'] ?? 'EFECTIVO'
         ];
     }
+    
+    // ✅ ADICIONAL: Marcar como sincronizados los consumos que YA están en area_movements
+    // para que dejen de aparecer en la lista de "Pendientes"
+    $sqlMarkDupes = "UPDATE wb_consumos c 
+                     SET sincronizado = 1, fecha_sincronizacion = NOW() 
+                     WHERE c.sincronizado = 0 
+                     AND EXISTS (
+                        SELECT 1 FROM area_movements am 
+                        WHERE am.descripcion LIKE CONCAT('%(Consumo #', c.id, ')%')
+                     )";
+    $affected = $pdo->exec($sqlMarkDupes);
+    $log("Autocorrección duplicados: $affected filas marcadas como sincronizadas en wb_consumos");
 
     // 1C. Gastos (wb_gastos)
     $sql = "SELECT id, fecha, area, descripcion, monto 
@@ -137,6 +173,10 @@ try {
         ];
     }
 
+
+    
+    $log("INICIO SINCRONIZACIÓN - UserID: $userId");
+
     // === 2. ENVIAR MOVIMIENTOS AL SISTEMA EXTERNO ===
     $syncedIds = [
         'area_movements' => [],
@@ -145,6 +185,8 @@ try {
     ];
     $syncedCount = 0;
     $errors = [];
+
+    $log("Movimientos a procesar: " . count($allMovements));
 
     foreach ($allMovements as $movement) {
         // Preparar datos para el sistema externo
@@ -160,6 +202,8 @@ try {
             'turno' => $username,
             'createdBy' => $username
         ];
+        
+        $log("Enviando item ID {$movement['id']} ({$movement['source']})");
 
         // Enviar al sistema externo via cURL
         $ch = curl_init(HOTEL_CASH_API_URL);
@@ -172,21 +216,29 @@ try {
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
+
+        $log("Respuesta API external: Code $httpCode");
+        if ($curlError) $log("Error CURL: $curlError");
 
         if ($httpCode === 200 && $response) {
             $result = json_decode($response, true);
+            $log("Response body: " . substr($response, 0, 100));
             
             if ($result && $result['success']) {
                 // Guardar ID para marcar como sincronizado
                 $syncedIds[$movement['source']][] = $movement['id'];
                 $syncedCount++;
+                $log("✅ Sincronizado OK");
             } else {
-                $errors[] = "Error en {$movement['source']} ID {$movement['id']}: " . 
-                           ($result['message'] ?? 'Error desconocido');
+                $errMsg = $result['message'] ?? 'Error desconocido';
+                $errors[] = "Error en {$movement['source']} ID {$movement['id']}: $errMsg";
+                $log("❌ Error API: $errMsg");
             }
         } else {
             $errors[] = "Error HTTP {$httpCode} en {$movement['source']} ID {$movement['id']}";
+            $log("❌ Error HTTP: $httpCode");
         }
     }
 
@@ -199,14 +251,17 @@ try {
         $pdo->exec("UPDATE area_movements 
                     SET sincronizado = 1, fecha_sincronizacion = '$now' 
                     WHERE id IN ($ids)");
+        $log("UPDATE area_movements: IDs $ids");
     }
 
     // Marcar wb_consumos
     if (!empty($syncedIds['wb_consumos'])) {
         $ids = implode(',', array_map('intval', $syncedIds['wb_consumos']));
-        $pdo->exec("UPDATE wb_consumos 
-                    SET sincronizado = 1, fecha_sincronizacion = '$now' 
-                    WHERE id IN ($ids)");
+        $sql = "UPDATE wb_consumos 
+                SET sincronizado = 1, fecha_sincronizacion = '$now' 
+                WHERE id IN ($ids)";
+        $affected = $pdo->exec($sql);
+        $log("UPDATE wb_consumos: IDs $ids - Afectados: $affected");
     }
 
     // Marcar wb_gastos
@@ -215,7 +270,10 @@ try {
         $pdo->exec("UPDATE wb_gastos 
                     SET sincronizado = 1, fecha_sincronizacion = '$now' 
                     WHERE id IN ($ids)");
+        $log("UPDATE wb_gastos: IDs $ids");
     }
+    
+    $log("FIN SINCRONIZACIÓN - Total sync: $syncedCount");
 
     // Respuesta
     echo json_encode([
@@ -228,6 +286,7 @@ try {
 
 } catch (Throwable $e) {
     http_response_code(400);
+    if(isset($log)) $log("EXCEPTION: " . $e->getMessage());
     echo json_encode([
         'success' => false,
         'synced' => 0,
