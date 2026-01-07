@@ -88,13 +88,14 @@ export function AdminDashboardPage() {
     return areas.map((area) => {
       const areaConsumos = consumos.filter((c) => c.area === area);
 
-      const total = areaConsumos.reduce((sum, c) => sum + c.total, 0);
+      // ✅ FIX: Convertir strings a números antes de sumar
+      const total = areaConsumos.reduce((sum, c) => sum + Number(c.total || 0), 0);
       const totalPagado = areaConsumos
         .filter((c) => c.estado === 'PAGADO')
-        .reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
+        .reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
       const totalHabitacion = areaConsumos
         .filter((c) => c.estado === 'CARGAR_HABITACION')
-        .reduce((sum, c) => sum + c.total, 0);
+        .reduce((sum, c) => sum + Number(c.total || 0), 0);
 
       return {
         area,
@@ -118,7 +119,8 @@ export function AdminDashboardPage() {
       metodoPago: c.metodoPago
     })));
 
-    const total = consumos.reduce((sum, c) => sum + c.total, 0);
+    // ✅ FIX: Convertir strings a números antes de sumar
+    const total = consumos.reduce((sum, c) => sum + Number(c.total || 0), 0);
     console.log('📊 TOTAL VENTAS calculado:', total);
 
     const consumosPagados = consumos.filter((c) => c.estado === 'PAGADO');
@@ -128,14 +130,15 @@ export function AdminDashboardPage() {
       total: c.total
     })));
 
-    const totalPagado = consumosPagados.reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
+    // ✅ FIX: Convertir strings a números antes de sumar
+    const totalPagado = consumosPagados.reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
     console.log('📊 TOTAL COBRADO calculado:', totalPagado);
 
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 
-    const totalIngresos = ingresos.reduce((sum, m) => sum + m.monto, 0);
-    const totalEgresos = egresos.reduce((sum, m) => sum + m.monto, 0);
+    const totalIngresos = ingresos.reduce((sum, m) => sum + Number(m.monto || 0), 0);
+    const totalEgresos = egresos.reduce((sum, m) => sum + Number(m.monto || 0), 0);
 
     // ✅ Balance en Caja = Ventas Cobradas - Gastos
     // Esto representa el dinero real que tienes en caja después de pagar gastos
