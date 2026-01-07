@@ -49,10 +49,11 @@ export function CajasResumenPage() {
     return getConsumosByDateRange(start, end, area);
   }, [periodo, area, getConsumosByDateRange, allConsumos]);
 
-  // Separar movimientos sincronizados y no sincronizados
+  // ✅ IMPORTANTE: Mostrar TODOS los movimientos sin sincronizar (sin filtro de fecha)
+  // para evitar perder datos si el usuario olvida sincronizar diariamente
   const movimientosSinSincronizar = useMemo(() =>
-    movimientos.filter(m => !m.sincronizado),
-    [movimientos]
+    allMovimientos.filter(m => !m.sincronizado && (area ? m.area === area : true)),
+    [allMovimientos, area]
   );
 
   const movimientosSincronizados = useMemo(() =>
