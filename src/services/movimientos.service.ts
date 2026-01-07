@@ -57,7 +57,7 @@ class MovimientosService {
         try {
             const response = await backendApi.get<{ success: boolean; entries: MovimientoCajaBackend[]; message?: string }>(
                 ENDPOINTS.MOVIMIENTOS.GET_MOVEMENTS,
-                { params }
+                { params: { ...params, _t: Date.now() } }
             );
 
             // Mapear 'entries' a 'movements' para mantener compatibilidad

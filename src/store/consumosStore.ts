@@ -190,7 +190,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
             total: c.total,
             estado: c.estado as 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL',
             montoPagado: c.monto_pagado || null,
-            metodoPago: c.metodo_pago as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
+            metodoPago: (c.metodo_pago ? String(c.metodo_pago).trim() : null) as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
             usuarioRegistroId: c.usuario_registro_id.toString(),
             ticketId: c.ticket_id || undefined,
             datosTarjeta: c.datosTarjeta,
@@ -291,7 +291,7 @@ export const useCajasStore = create<CajasStore>((set, get) => ({
           origen: m.origen as 'CONSUMO' | 'GASTO' | 'INICIAL' | 'TRANSFERENCIA' | 'AJUSTE',
           descripcion: m.descripcion,
           monto: Number(m.monto),
-          metodoPago: (m.metodo_pago as any) || undefined,
+          metodoPago: (m.metodo_pago ? String(m.metodo_pago).trim() : undefined) as any,
           usuario: user?.username, // Usar username
           sincronizado: m.sincronizado || false,
           fechaSincronizacion: m.fecha_sincronizacion
