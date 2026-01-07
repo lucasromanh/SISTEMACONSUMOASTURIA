@@ -107,11 +107,29 @@ export function AdminDashboardPage() {
   }, [consumos]);
 
   const globalStats = useMemo(() => {
-    const total = consumos.reduce((sum, c) => sum + c.total, 0);
+    console.log('📊 ADMIN DASHBOARD - Calculando globalStats');
+    console.log('📊 Total consumos para cálculo:', consumos.length);
+    console.log('📊 Consumos detalle:', consumos.map(c => ({
+      id: c.id,
+      area: c.area,
+      estado: c.estado,
+      total: c.total,
+      montoPagado: c.montoPagado,
+      metodoPago: c.metodoPago
+    })));
 
-    const totalPagado = consumos
-      .filter((c) => c.estado === 'PAGADO')
-      .reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
+    const total = consumos.reduce((sum, c) => sum + c.total, 0);
+    console.log('📊 TOTAL VENTAS calculado:', total);
+
+    const consumosPagados = consumos.filter((c) => c.estado === 'PAGADO');
+    console.log('📊 Consumos PAGADOS:', consumosPagados.length, consumosPagados.map(c => ({
+      id: c.id,
+      montoPagado: c.montoPagado,
+      total: c.total
+    })));
+
+    const totalPagado = consumosPagados.reduce((sum, c) => sum + (c.montoPagado || c.total || 0), 0);
+    console.log('📊 TOTAL COBRADO calculado:', totalPagado);
 
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
@@ -126,6 +144,15 @@ export function AdminDashboardPage() {
     // ✅ Balance Proyectado = Total Ventas - Gastos
     // Incluye ventas pendientes de cobro (cargar a habitación)
     const totalNetoProyectado = total - totalEgresos;
+
+    console.log('📊 RESUMEN FINAL:', {
+      total,
+      totalPagado,
+      totalIngresos,
+      totalEgresos,
+      totalNeto,
+      totalNetoProyectado
+    });
 
     return {
       total,
