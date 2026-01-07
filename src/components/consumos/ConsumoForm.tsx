@@ -407,7 +407,27 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
 
       // Función auxiliar para registrar consumos (pagados o cargados a habitación)
       const registrarConsumos = async (estadoAUsar: string, pagosParam: PagoRegistrado[], montoPagadoPorProducto?: number) => {
+        // 🐛 DEBUG: Log inicial del proceso
+        console.log('🔄 INICIANDO REGISTRO DE CONSUMOS:', {
+          ticketId: pedido.ticketId,
+          totalProductos: pedido.productos.length,
+          productos: pedido.productos.map(p => ({ nombre: p.nombre, precio: p.precioUnitario, cantidad: p.cantidad, subtotal: p.subtotal })),
+          estadoAUsar,
+          totalPagos: pagosParam.length
+        });
+
+        let productosRegistrados = 0;
+        let erroresEncontrados: any[] = [];
+
         for (const producto of pedido.productos) {
+          const indexProducto = pedido.productos.indexOf(producto);
+          console.log(`📦 PROCESANDO PRODUCTO ${indexProducto + 1}/${pedido.productos.length}:`, {
+            nombre: producto.nombre,
+            categoria: producto.categoria,
+            precio: producto.precioUnitario,
+            cantidad: producto.cantidad,
+            subtotal: producto.subtotal
+          });
           // ✅ Determinar método de pago desde el array de pagos (fuente de verdad)
           let metodoFinal: MetodoPago | undefined = undefined;
           const pagosTarjeta = pagosParam.filter(p => p.metodo === 'TARJETA_CREDITO' && p.datosTarjeta);
@@ -483,7 +503,35 @@ export function ConsumoForm({ area, productosPorCategoria }: ConsumoFormProps) {
             tieneDatosTransferencia: !!consumoData.datosTransferencia
           });
 
-          await addConsumo(consumoData);
+          try {
+            await addConsumo(consumoData);
+            productosRegistrados++;
+            console.log(`✅ PRODUCTO ${indexProducto + 1} REGISTRADO EXITOSAMENTE`);
+          } catch (error) {
+            console.error(`❌ ERROR AL REGISTRAR PRODUCTO ${indexProducto + 1}:`, error);
+            erroresEncontrados.push({
+              producto: producto.nombre,
+              error: error instanceof Error ? error.message : String(error)
+            });
+            // No lanzar el error para que continúe con los demás productos
+          }
+        }
+
+        // 🐛 DEBUG: Log final del proceso
+        console.log('✅ REGISTRO DE CONSUMOS COMPLETADO:', {
+          totalProductos: pedido.productos.length,
+          productosRegistrados,
+          errores: erroresEncontrados.length,
+          detalleErrores: erroresEncontrados
+        });
+
+        // Si hubo errores, mostrar toast de advertencia
+        if (erroresEncontrados.length > 0) {
+          toast({
+            variant: "destructive",
+            title: "⚠️ Algunos productos no se registraron",
+            description: `${erroresEncontrados.length} de ${pedido.productos.length} productos fallaron. Revisa la consola para más detalles.`,
+          });
         }
       };
 

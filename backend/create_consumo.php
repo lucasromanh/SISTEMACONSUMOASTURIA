@@ -178,11 +178,20 @@ try {
     
     // 🔍 ESCRIBIR DEBUG A ARCHIVO
     $debugFile = __DIR__ . '/debug_create_consumo.txt';
-    file_put_contents($debugFile, 
-        date('Y-m-d H:i:s') . " - metodo_pago recibido: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n" .
-        "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n\n",
-        FILE_APPEND
-    );
+    $timestamp = date('Y-m-d H:i:s');
+    $debugContent = "\n========================================\n";
+    $debugContent .= "$timestamp - NUEVA REQUEST CREATE_CONSUMO\n";
+    $debugContent .= "========================================\n";
+    $debugContent .= "ticket_id: " . var_export($data['ticket_id'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "consumo_descripcion: " . var_export($data['consumo_descripcion'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "categoria: " . var_export($data['categoria'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "precio_unitario: " . var_export($data['precio_unitario'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "cantidad: " . var_export($data['cantidad'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "metodo_pago: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "estado: " . var_export($data['estado'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n";
+    file_put_contents($debugFile, $debugContent, FILE_APPEND);
+    
     
     $metodoPago = trim($data['metodo_pago'] ?? '');
     $montoPagado = isset($data['monto_pagado']) ? (float)$data['monto_pagado'] : null;
@@ -263,41 +272,42 @@ try {
             ':ticket_id'   => $ticketId ?: null,
         ]);
         
+        // 🐛 DEBUG: Ver qué se insertó
+        error_log("✅ CREATE_CONSUMO - INSERT ejecutado con metodo_pago: " . var_export($metodoPago ?: null, true));
+        
+        // 🔍 ESCRIBIR DEBUG A ARCHIVO
+        $debugFile = __DIR__ . '/debug_create_consumo.txt';
+        $timestamp = date('Y-m-d H:i:s');
+        file_put_contents($debugFile, 
+            "$timestamp - ✅ INSERT EXITOSO\n" .
+            "consumo_id generado: PENDIENTE (se obtiene en línea siguiente)\n" .
+            "metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
+            "estado: $estado, montoPagado: $montoPagado\n\n",
+            FILE_APPEND
+        );
+
         $consumoId = (int)$pdo->lastInsertId();
         
-        // 🐛 DEBUG CRÍTICO: Verificar qué se insertó REALMENTE en la BD
+        // � DEBUG CRÍTICO: Verificar qué se insertó REALMENTE en la BD
         $stmtVerify = $pdo->prepare("SELECT metodo_pago FROM wb_consumos WHERE id = :id");
         $stmtVerify->execute([':id' => $consumoId]);
         $verificacion = $stmtVerify->fetch(PDO::FETCH_ASSOC);
         
-        error_log("✅ CREATE_CONSUMO - INSERT ejecutado. ID: {$consumoId}");
+        // �🔍 Log del ID generado y verificación
+        error_log("✅ CREATE_CONSUMO - consumo_id generado: $consumoId");
         error_log("✅ Variable \$metodoPago antes de INSERT: " . var_export($metodoPago, true));
         error_log("✅ Valor enviado al PDO: " . var_export($metodoPago ?: null, true));
         error_log("✅ Valor EN LA BD después de INSERT: " . var_export($verificacion['metodo_pago'] ?? 'NULL', true));
         
         file_put_contents($debugFile, 
-            date('Y-m-d H:i:s') . " - metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
-            "estado: {$estado}, montoPagado: {$montoPagado}\n" .
-            "Verificación BD: " . var_export($verificacion['metodo_pago'] ?? 'NULL', true) . "\n\n",
+            "$timestamp - consumo_id REAL: $consumoId\n" .
+            "Verificación BD - metodo_pago: " . var_export($verificacion['metodo_pago'] ?? 'NULL', true) . "\n" .
+            "----------------------------------------\n\n",
             FILE_APPEND
         );
 
         // ✅ NUEVO: Si el consumo es PAGADO, crear registro en wb_consumo_pagos
         if ($estado === 'PAGADO' && $metodoPago && $montoPagado > 0) {
-            // 🔍 DEBUG: Ver qué se va a guardar
-            error_log("🔍 CREATE - Guardando wb_consumo_pagos:");
-            error_log("  - consumo_id: {$consumoId}");
-            error_log("  - metodo: {$metodoPago}");
-            error_log("  - imagen_comprobante length: " . strlen($imagenComprobante));
-            
-            file_put_contents($debugFile, 
-                date('Y-m-d H:i:s') . " - GUARDANDO wb_consumo_pagos\n" .
-                "  - consumo_id: {$consumoId}\n" .
-                "  - metodo: {$metodoPago}\n" .
-                "  - imagen_comprobante length: " . strlen($imagenComprobante) . "\n",
-                FILE_APPEND
-            );
-            
             $stmtPago = $pdo->prepare("
                 INSERT INTO wb_consumo_pagos
                 (consumo_id, fecha, metodo, monto, usuario_registro_id, datos_tarjeta, imagen_comprobante)
@@ -313,9 +323,6 @@ try {
                 ':datos_tarjeta' => $datosTarjeta,
                 ':imagen_comprobante' => $imagenComprobante ?: null,
             ]);
-            
-            $pagoId = $pdo->lastInsertId();
-            file_put_contents($debugFile, "  - pago_id insertado: {$pagoId}\n", FILE_APPEND);
             
             // ✅ NUEVO: Crear movimiento de caja para sincronización con Caja del Hotel
             // Solo para EFECTIVO, TRANSFERENCIA y TARJETA_CREDITO (no para CARGAR_HABITACION)

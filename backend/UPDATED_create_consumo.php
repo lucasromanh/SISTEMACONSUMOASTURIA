@@ -178,11 +178,20 @@ try {
     
     // 🔍 ESCRIBIR DEBUG A ARCHIVO
     $debugFile = __DIR__ . '/debug_create_consumo.txt';
-    file_put_contents($debugFile, 
-        date('Y-m-d H:i:s') . " - metodo_pago recibido: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n" .
-        "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n\n",
-        FILE_APPEND
-    );
+    $timestamp = date('Y-m-d H:i:s');
+    $debugContent = "\n========================================\n";
+    $debugContent .= "$timestamp - NUEVA REQUEST CREATE_CONSUMO\n";
+    $debugContent .= "========================================\n";
+    $debugContent .= "ticket_id: " . var_export($data['ticket_id'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "consumo_descripcion: " . var_export($data['consumo_descripcion'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "categoria: " . var_export($data['categoria'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "precio_unitario: " . var_export($data['precio_unitario'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "cantidad: " . var_export($data['cantidad'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "metodo_pago: " . var_export($data['metodo_pago'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "estado: " . var_export($data['estado'] ?? 'NO DEFINIDO', true) . "\n";
+    $debugContent .= "Datos completos: " . json_encode($data, JSON_PRETTY_PRINT) . "\n";
+    file_put_contents($debugFile, $debugContent, FILE_APPEND);
+    
     
     $metodoPago = trim($data['metodo_pago'] ?? '');
     $montoPagado = isset($data['monto_pagado']) ? (float)$data['monto_pagado'] : null;
@@ -268,13 +277,24 @@ try {
         
         // 🔍 ESCRIBIR DEBUG A ARCHIVO
         $debugFile = __DIR__ . '/debug_create_consumo.txt';
+        $timestamp = date('Y-m-d H:i:s');
         file_put_contents($debugFile, 
-            date('Y-m-d H:i:s') . " - metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
+            "$timestamp - ✅ INSERT EXITOSO\n" .
+            "consumo_id generado: PENDIENTE (se obtiene en línea siguiente)\n" .
+            "metodo_pago insertado: " . var_export($metodoPago ?: null, true) . "\n" .
             "estado: $estado, montoPagado: $montoPagado\n\n",
             FILE_APPEND
         );
 
         $consumoId = (int)$pdo->lastInsertId();
+        
+        // 🔍 Log del ID generado
+        error_log("✅ CREATE_CONSUMO - consumo_id generado: $consumoId");
+        file_put_contents($debugFile, 
+            "$timestamp - consumo_id REAL: $consumoId\n" .
+            "----------------------------------------\n\n",
+            FILE_APPEND
+        );
 
         // ✅ NUEVO: Si el consumo es PAGADO, crear registro en wb_consumo_pagos
         if ($estado === 'PAGADO' && $metodoPago && $montoPagado > 0) {
