@@ -65,6 +65,15 @@ export function CajasResumenPage() {
     console.log('📊 RESUMEN - Total movimientos:', movimientos.length);
     console.log('📊 RESUMEN - Total consumos:', consumos.length);
 
+    // 🔍 DEBUG: Ver TODOS los consumos y sus metodoPago
+    console.log('🔍 TODOS LOS CONSUMOS:', consumos.map(c => ({
+      id: c.id,
+      estado: c.estado,
+      metodoPago: c.metodoPago,
+      montoPagado: c.montoPagado,
+      total: c.total
+    })));
+
     const ingresos = movimientos.filter((m) => m.tipo === 'INGRESO');
     const egresos = movimientos.filter((m) => m.tipo === 'EGRESO');
 

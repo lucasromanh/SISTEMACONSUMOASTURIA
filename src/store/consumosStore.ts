@@ -175,9 +175,15 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
       if (response.success && response.consumos) {
         // 🔍 DEBUG: Ver qué llega del backend
         console.log('📥 CONSUMOS RECIBIDOS DEL BACKEND:', response.consumos.length);
+        console.log('📥 PRIMEROS 3 CONSUMOS RAW:', response.consumos.slice(0, 3));
 
         const consumosFormatted: Consumo[] = response.consumos.map((c) => {
-          // ... (existing mapping code)
+          // 🔍 DEBUG: Ver transformación de metodo_pago
+          const metodoPagoRaw = c.metodo_pago;
+          const metodoPagoProcessed = (c.metodo_pago ? String(c.metodo_pago).trim() : null) as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null;
+
+          console.log(`📝 Consumo #${c.id}: metodo_pago RAW="${metodoPagoRaw}" → PROCESSED="${metodoPagoProcessed}", estado="${c.estado}"`);
+
           return {
             id: c.id.toString(),
             fecha: c.fecha.split(' ')[0],
@@ -190,7 +196,7 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
             total: c.total,
             estado: c.estado as 'CARGAR_HABITACION' | 'PAGADO' | 'PAGO_PARCIAL',
             montoPagado: c.monto_pagado || null,
-            metodoPago: (c.metodo_pago ? String(c.metodo_pago).trim() : null) as 'EFECTIVO' | 'TRANSFERENCIA' | 'TARJETA_CREDITO' | 'CARGAR_HABITACION' | null,
+            metodoPago: metodoPagoProcessed,
             usuarioRegistroId: c.usuario_registro_id.toString(),
             ticketId: c.ticket_id || undefined,
             datosTarjeta: c.datosTarjeta,
@@ -198,6 +204,14 @@ export const useConsumosStore = create<ConsumosStore>((set, get) => ({
             imagenComprobante: c.imagen_comprobante,
           };
         });
+
+        console.log('✅ CONSUMOS FORMATEADOS:', consumosFormatted.length);
+        console.log('✅ PRIMEROS 3 FORMATEADOS:', consumosFormatted.slice(0, 3).map(c => ({
+          id: c.id,
+          estado: c.estado,
+          metodoPago: c.metodoPago,
+          montoPagado: c.montoPagado
+        })));
 
         // ✅ ACTUALIZAR STORE DE CONSUMOS
         set({ consumos: consumosFormatted });
