@@ -56,9 +56,11 @@ export function CajasResumenPage() {
     [allMovimientos, area]
   );
 
+  // ✅ FIX: Mostrar TODOS los movimientos sincronizados (sin filtro de fecha)
+  // para que el usuario pueda ver el historial de movimientos ya enviados
   const movimientosSincronizados = useMemo(() =>
-    movimientos.filter(m => m.sincronizado),
-    [movimientos]
+    allMovimientos.filter(m => m.sincronizado && (area ? m.area === area : true)),
+    [allMovimientos, area]
   );
 
   const resumen = useMemo(() => {
@@ -206,27 +208,31 @@ export function CajasResumenPage() {
         </CardContent>
       </Card>
 
-      {/* Movimientos sincronizados */}
-      {movimientosSincronizados.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                Movimientos Sincronizados
-                <Badge variant="secondary" className="bg-green-600 text-white">
-                  {movimientosSincronizados.length}
-                </Badge>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">
-                Ya enviados a Caja del Hotel
-              </p>
-            </div>
-          </CardHeader>
-          <CardContent>
+      {/* Movimientos sincronizados - SIEMPRE VISIBLE */}
+      <Card>
+        <CardHeader>
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              Movimientos Sincronizados
+              <Badge variant="secondary" className="bg-green-600 text-white">
+                {movimientosSincronizados.length}
+              </Badge>
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              Ya enviados a Caja del Hotel
+            </p>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {movimientosSincronizados.length > 0 ? (
             <CajaDetalleTabla movimientos={movimientosSincronizados} />
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="font-medium">No hay movimientos sincronizados aún</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
