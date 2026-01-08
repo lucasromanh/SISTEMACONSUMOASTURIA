@@ -76,8 +76,16 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
   // Filtrar movimientos del día seleccionado
   const movimientos = useMemo(() => {
-    return allMovimientos.filter((m: MovimientoCaja) => {
-      if (!m.fecha || typeof m.fecha !== 'string') return false;
+    console.log('🔍 FILTRADO DE MOVIMIENTOS - Inicio');
+    console.log('🔍 allMovimientos.length:', allMovimientos.length);
+    console.log('🔍 fechaISO buscada:', fechaISO);
+    console.log('🔍 area buscada:', area);
+
+    const filtered = allMovimientos.filter((m: MovimientoCaja) => {
+      if (!m.fecha || typeof m.fecha !== 'string') {
+        console.log('❌ Movimiento sin fecha válida:', m);
+        return false;
+      }
 
       let convertedFecha: string;
       if (m.fecha.includes('-')) {
@@ -86,14 +94,37 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
       } else {
         // Convertir de 'dd/MM/yyyy' a 'yyyy-MM-dd'
         const parts = m.fecha.split('/');
-        if (parts.length !== 3) return false;
+        if (parts.length !== 3) {
+          console.log('❌ Fecha con formato inválido:', m.fecha);
+          return false;
+        }
         const [day, month, year] = parts;
-        if (!day || !month || !year) return false;
+        if (!day || !month || !year) {
+          console.log('❌ Partes de fecha inválidas:', { day, month, year });
+          return false;
+        }
         convertedFecha = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
 
-      return convertedFecha === fechaISO && m.area?.toUpperCase() === area?.toUpperCase();
+      const matchesFecha = convertedFecha === fechaISO;
+      const matchesArea = m.area?.toUpperCase() === area?.toUpperCase();
+
+      console.log('🔍 Movimiento:', {
+        id: m.id,
+        fechaOriginal: m.fecha,
+        fechaConvertida: convertedFecha,
+        area: m.area,
+        matchesFecha,
+        matchesArea,
+        incluido: matchesFecha && matchesArea
+      });
+
+      return matchesFecha && matchesArea;
     });
+
+    console.log('✅ Movimientos filtrados:', filtered.length);
+    console.log('✅ Movimientos:', filtered);
+    return filtered;
   }, [fechaISO, area, allMovimientos]);
 
   // Filtrar gastos del día seleccionado
@@ -239,41 +270,70 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
   // Calcular totales del día
   const totalesDia = useMemo(() => {
+    console.log('🔍 AREA DASHBOARD - Calculando totales del día');
+    console.log('🔍 Total movimientos:', movimientos.length);
+    console.log('🔍 Total consumos:', consumos.length);
+    console.log('🔍 Total gastos:', gastos.length);
+
     // Usar movimientos como fuente de verdad para totales financieros
     const ingresoInicial = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'INICIAL')
-      .reduce((sum: number, m: MovimientoCaja) => sum + Number(m.monto), 0);
+      .reduce((sum: number, m: MovimientoCaja) => sum + Number(m.monto || 0), 0);
+
+    console.log('💰 Ingreso Inicial:', ingresoInicial);
 
     const consumosEfectivo = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'EFECTIVO')
-      .reduce((sum, m) => sum + Number(m.monto), 0);
+      .reduce((sum, m) => sum + Number(m.monto || 0), 0);
+
+    console.log('💵 Consumos Efectivo (desde movimientos):', consumosEfectivo);
 
     const consumosTransferencia = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
-      .reduce((sum, m) => sum + Number(m.monto), 0);
+      .reduce((sum, m) => sum + Number(m.monto || 0), 0);
+
+    console.log('🏦 Consumos Transferencia (desde movimientos):', consumosTransferencia);
 
     // ✅ CORREGIDO: Tarjeta desde CONSUMOS, no desde movimientos (no generan movimientos de caja)
     const consumosTarjeta = consumos
       .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TARJETA_CREDITO')
-      .reduce((sum, c) => sum + Number(c.montoPagado || c.total), 0);
+      .reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
+
+    console.log('💳 Consumos Tarjeta (desde consumos):', consumosTarjeta);
 
     // Consumos cargados a habitación (source: consumos o movimientos si no hay consumos)
     const consumosCargadosFromConsumos = consumos
       .filter((c) => c.estado === 'CARGAR_HABITACION')
-      .reduce((sum, c) => sum + Number(c.total), 0);
+      .reduce((sum, c) => sum + Number(c.total || 0), 0);
 
     const consumosCargadosFromMov = movimientos
       .filter((m) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && (!m.metodoPago || m.metodoPago === undefined))
-      .reduce((sum, m) => sum + Number(m.monto), 0);
+      .reduce((sum, m) => sum + Number(m.monto || 0), 0);
 
     const consumosCargados = Math.max(consumosCargadosFromConsumos, consumosCargadosFromMov);
 
-    const totalGastosFromMov = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, m) => sum + Number(m.monto), 0);
-    const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + Number(g.monto), 0));
+    console.log('🏨 Consumos Cargados:', consumosCargados);
+
+    const totalGastosFromMov = movimientos.filter((m) => m.tipo === 'EGRESO').reduce((sum, m) => sum + Number(m.monto || 0), 0);
+    const totalGastos = Math.max(totalGastosFromMov, gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0));
     const gastosEfectivo = totalGastos;
+
+    console.log('📉 Total Gastos:', totalGastos);
 
     const totalIngresos = ingresoInicial + consumosEfectivo + consumosTransferencia + consumosTarjeta;
     const saldoFinal = ingresoInicial + consumosEfectivo - gastosEfectivo;
+
+    console.log('📊 TOTALES FINALES:', {
+      ingresoInicial,
+      consumosEfectivo,
+      consumosTransferencia,
+      consumosTarjeta,
+      consumosCargados,
+      totalGastos,
+      gastosEfectivo,
+      totalIngresos,
+      saldoFinal
+    });
 
     return {
       ingresoInicial,
@@ -411,10 +471,10 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                   <div
                     key={index}
                     className={`flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-lg border w-full ${transaccion.tipo === 'INGRESO_INICIAL'
-                        ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'
-                        : transaccion.tipo === 'CONSUMO'
-                          ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
-                          : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
+                      ? 'bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800'
+                      : transaccion.tipo === 'CONSUMO'
+                        ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+                        : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
                       }`}
                   >
                     <div className="flex items-start gap-3 flex-1 w-full">
@@ -459,8 +519,8 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
                     </div>
                     <div className="text-right w-full sm:w-auto">
                       <p className={`text-xl sm:text-2xl font-bold ${transaccion.tipo === 'GASTO'
-                          ? 'text-red-700 dark:text-red-400'
-                          : 'text-green-700 dark:text-green-400'
+                        ? 'text-red-700 dark:text-red-400'
+                        : 'text-green-700 dark:text-green-400'
                         }`}>
                         {transaccion.tipo === 'GASTO' ? '-' : '+'}{formatCurrency(transaccion.monto)}
                       </p>
