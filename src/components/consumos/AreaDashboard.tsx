@@ -89,8 +89,9 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
       let convertedFecha: string;
       if (m.fecha.includes('-')) {
-        // Ya está en formato 'yyyy-MM-dd'
-        convertedFecha = m.fecha;
+        // Ya está en formato 'yyyy-MM-dd' o 'yyyy-MM-dd HH:mm:ss'
+        // ✅ FIX: Extraer solo la parte de la fecha (antes del espacio)
+        convertedFecha = m.fecha.split(' ')[0];
       } else {
         // Convertir de 'dd/MM/yyyy' a 'yyyy-MM-dd'
         const parts = m.fecha.split('/');
@@ -288,11 +289,20 @@ export function AreaDashboard({ area, titulo, productosPorCategoria }: AreaDashb
 
     console.log('💵 Consumos Efectivo (desde movimientos):', consumosEfectivo);
 
-    const consumosTransferencia = movimientos
+    // ✅ FIX: Si no hay movimientos de transferencia, calcular desde consumos
+    const consumosTransferenciaFromMov = movimientos
       .filter((m: MovimientoCaja) => m.tipo === 'INGRESO' && m.origen === 'CONSUMO' && m.metodoPago === 'TRANSFERENCIA')
       .reduce((sum, m) => sum + Number(m.monto || 0), 0);
 
-    console.log('🏦 Consumos Transferencia (desde movimientos):', consumosTransferencia);
+    const consumosTransferenciaFromConsumos = consumos
+      .filter((c) => c.estado === 'PAGADO' && c.metodoPago === 'TRANSFERENCIA')
+      .reduce((sum, c) => sum + Number(c.montoPagado || c.total || 0), 0);
+
+    const consumosTransferencia = Math.max(consumosTransferenciaFromMov, consumosTransferenciaFromConsumos);
+
+    console.log('🏦 Consumos Transferencia (desde movimientos):', consumosTransferenciaFromMov);
+    console.log('🏦 Consumos Transferencia (desde consumos):', consumosTransferenciaFromConsumos);
+    console.log('🏦 Consumos Transferencia (FINAL):', consumosTransferencia);
 
     // ✅ CORREGIDO: Tarjeta desde CONSUMOS, no desde movimientos (no generan movimientos de caja)
     const consumosTarjeta = consumos
